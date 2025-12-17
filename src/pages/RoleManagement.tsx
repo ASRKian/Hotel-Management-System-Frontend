@@ -1,0 +1,306 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import { Plus } from "lucide-react";
+import Sidebar from "@/components/layout/Sidebar";
+
+// ---- Types ----
+type PermissionAction = "read" | "write" | "delete";
+
+type Permission = {
+    key: string;
+    actions: PermissionAction[];
+};
+
+type Role = {
+    id: string;
+    name: string;
+    permissions: Permission[];
+};
+
+const SIDEBAR_MODULES = [
+    { key: "dashboard", label: "Dashboard" },
+    { key: "reservations", label: "Reservations" },
+    { key: "rooms", label: "Rooms" },
+    { key: "guests", label: "Guests" },
+    { key: "billing", label: "Billing" },
+    { key: "settings", label: "Settings" },
+];
+
+// ---- Initial data shape example ----
+const INITIAL_ROLES: Role[] = [
+    {
+        id: "3",
+        name: "Demo",
+        permissions: [],
+    },
+    {
+        id: "4",
+        name: "Demo1",
+        permissions: [],
+    },
+    {
+        id: "5",
+        name: "Demo2",
+        permissions: [],
+    },
+    {
+        id: "1",
+        name: "SUPER_ADMIN",
+        permissions: SIDEBAR_MODULES.map((m) => ({
+            key: m.key,
+            actions: ["read", "write", "delete"],
+        })),
+    },
+    {
+        id: "1",
+        name: "SUPER_ADMIN",
+        permissions: SIDEBAR_MODULES.map((m) => ({
+            key: m.key,
+            actions: ["read", "write", "delete"],
+        })),
+    },
+    {
+        id: "1",
+        name: "SUPER_ADMIN",
+        permissions: SIDEBAR_MODULES.map((m) => ({
+            key: m.key,
+            actions: ["read", "write", "delete"],
+        })),
+    },
+    {
+        id: "1",
+        name: "SUPER_ADMIN",
+        permissions: SIDEBAR_MODULES.map((m) => ({
+            key: m.key,
+            actions: ["read", "write", "delete"],
+        })),
+    },
+    {
+        id: "1",
+        name: "SUPER_ADMIN",
+        permissions: SIDEBAR_MODULES.map((m) => ({
+            key: m.key,
+            actions: ["read", "write", "delete"],
+        })),
+    },
+];
+
+export default function RoleManagement() {
+    const [roles, setRoles] = useState<Role[]>(INITIAL_ROLES);
+    const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+    const [newRoleName, setNewRoleName] = useState("");
+
+    const hasPermission = (
+        role: Role,
+        moduleKey: string,
+        action: PermissionAction
+    ) =>
+        role.permissions
+            .find((p) => p.key === moduleKey)
+            ?.actions.includes(action) ?? false;
+
+    const togglePermission = (
+        roleId: string,
+        moduleKey: string,
+        action: PermissionAction
+    ) => {
+        setRoles((prev) =>
+            prev.map((role) => {
+                if (role.id !== roleId) return role;
+
+                const existing = role.permissions.find((p) => p.key === moduleKey);
+
+                if (!existing) {
+                    return {
+                        ...role,
+                        permissions: [
+                            ...role.permissions,
+                            { key: moduleKey, actions: [action] },
+                        ],
+                    };
+                }
+
+                const updatedActions = existing.actions.includes(action)
+                    ? existing.actions.filter((a) => a !== action)
+                    : [...existing.actions, action];
+
+                return {
+                    ...role,
+                    permissions: role.permissions.map((p) =>
+                        p.key === moduleKey ? { ...p, actions: updatedActions } : p
+                    ),
+                };
+            })
+        );
+    };
+
+    const addRole = () => {
+        if (!newRoleName.trim()) return;
+        setRoles((prev) => [
+            ...prev,
+            {
+                id: Date.now().toString(),
+                name: newRoleName,
+                permissions: [],
+            },
+        ]);
+        setNewRoleName("");
+    };
+
+    return (
+        <div className="min-h-screen bg-background">
+            <Sidebar />
+
+            {/* Page Content */}
+            <main className="lg:ml-64 h-screen overflow-hidden">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] h-full">
+                    <section className="h-full overflow-y-auto scrollbar-hide p-6 lg:p-8 border-b lg:border-b-0 lg:border-r border-border">
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h1 className="text-2xl font-bold text-foreground">Roles</h1>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    Manage roles available in your organization.
+                                </p>
+                            </div>
+
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button variant="hero">
+                                        <Plus className="h-4 w-4 mr-2" /> Add Role
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Create New Role</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4 mt-4">
+                                        <div className="space-y-2">
+                                            <Label>Role Name</Label>
+                                            <Input
+                                                value={newRoleName}
+                                                onChange={(e) => setNewRoleName(e.target.value)}
+                                                placeholder="e.g. Front Desk"
+                                            />
+                                        </div>
+                                        <Button onClick={addRole} className="w-full" variant="hero">
+                                            Create Role
+                                        </Button>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+
+                        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Role</TableHead>
+                                        <TableHead>Permissions</TableHead>
+                                        <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {roles.map((role) => (
+                                        <TableRow key={role.id}>
+                                            <TableCell className="font-medium">{role.name}</TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {role.permissions.length === 0
+                                                    ? "No permissions"
+                                                    : `${role.permissions.length} modules`}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    size="sm"
+                                                    variant="heroOutline"
+                                                    onClick={() => setSelectedRole(role)}
+                                                >
+                                                    Manage
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </section>
+
+                    <section className="h-full overflow-y-auto scrollbar-hide p-6 lg:p-8 bg-muted/20">
+                        {selectedRole ? (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="bg-card rounded-2xl border border-border shadow-sm p-6"
+                            >
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-lg font-semibold text-foreground">
+                                        Permissions – {selectedRole.name}
+                                    </h2>
+                                    <Button size="sm" variant="ghost" onClick={() => setSelectedRole(null)}>
+                                        Close
+                                    </Button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {SIDEBAR_MODULES.map((module) => (
+                                        <div
+                                            key={module.key}
+                                            className="flex items-center justify-between border border-border rounded-xl p-4"
+                                        >
+                                            <span className="font-medium text-foreground">
+                                                {module.label}
+                                            </span>
+                                            <div className="flex items-center gap-6">
+                                                {["read", "write", "delete"].map((action) => (
+                                                    <div key={action} className="flex items-center gap-2">
+                                                        <Checkbox
+                                                            checked={hasPermission(
+                                                                selectedRole,
+                                                                module.key,
+                                                                action as PermissionAction
+                                                            )}
+                                                            onCheckedChange={() =>
+                                                                togglePermission(
+                                                                    selectedRole.id,
+                                                                    module.key,
+                                                                    action as PermissionAction
+                                                                )
+                                                            }
+                                                        />
+                                                        <Label className="text-sm capitalize">{action}</Label>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-muted-foreground">
+                                Select a role to manage permissions
+                            </div>
+                        )}
+                    </section>
+                </div>
+            </main>
+        </div>
+    );
+}
