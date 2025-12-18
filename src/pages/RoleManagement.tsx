@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,150 +21,91 @@ import {
 } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
+import { useGetSidebarPermissionQuery, useLazyGetAllRolesQuery, useLazyGetAllSidebarLinksQuery } from "@/redux/services/hmsApi";
+import { useAppSelector } from "@/redux/hook";
 
-// ---- Types ----
-type PermissionAction = "read" | "write" | "delete";
+const PERMISSION_ACTIONS = [
+    { key: "read", label: "read", field: "can_read" },
+    { key: "create", label: "write", field: "can_create" },
+    { key: "update", label: "update", field: "can_update" },
+    { key: "delete", label: "delete", field: "can_delete" },
+] as const;
 
-type Permission = {
-    key: string;
-    actions: PermissionAction[];
-};
-
-type Role = {
-    id: string;
-    name: string;
-    permissions: Permission[];
-};
-
-const SIDEBAR_MODULES = [
-    { key: "dashboard", label: "Dashboard" },
-    { key: "reservations", label: "Reservations" },
-    { key: "rooms", label: "Rooms" },
-    { key: "guests", label: "Guests" },
-    { key: "billing", label: "Billing" },
-    { key: "settings", label: "Settings" },
-];
-
-// ---- Initial data shape example ----
-const INITIAL_ROLES: Role[] = [
-    {
-        id: "3",
-        name: "Demo",
-        permissions: [],
-    },
-    {
-        id: "4",
-        name: "Demo1",
-        permissions: [],
-    },
-    {
-        id: "5",
-        name: "Demo2",
-        permissions: [],
-    },
-    {
-        id: "1",
-        name: "SUPER_ADMIN",
-        permissions: SIDEBAR_MODULES.map((m) => ({
-            key: m.key,
-            actions: ["read", "write", "delete"],
-        })),
-    },
-    {
-        id: "1",
-        name: "SUPER_ADMIN",
-        permissions: SIDEBAR_MODULES.map((m) => ({
-            key: m.key,
-            actions: ["read", "write", "delete"],
-        })),
-    },
-    {
-        id: "1",
-        name: "SUPER_ADMIN",
-        permissions: SIDEBAR_MODULES.map((m) => ({
-            key: m.key,
-            actions: ["read", "write", "delete"],
-        })),
-    },
-    {
-        id: "1",
-        name: "SUPER_ADMIN",
-        permissions: SIDEBAR_MODULES.map((m) => ({
-            key: m.key,
-            actions: ["read", "write", "delete"],
-        })),
-    },
-    {
-        id: "1",
-        name: "SUPER_ADMIN",
-        permissions: SIDEBAR_MODULES.map((m) => ({
-            key: m.key,
-            actions: ["read", "write", "delete"],
-        })),
-    },
-];
 
 export default function RoleManagement() {
-    const [roles, setRoles] = useState<Role[]>(INITIAL_ROLES);
-    const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+    const [roles, setRoles] = useState<[]>();
     const [newRoleName, setNewRoleName] = useState("");
+    const [permissions, setPermissions] = useState([]);
+    const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
-    const hasPermission = (
-        role: Role,
-        moduleKey: string,
-        action: PermissionAction
-    ) =>
-        role.permissions
-            .find((p) => p.key === moduleKey)
-            ?.actions.includes(action) ?? false;
 
-    const togglePermission = (
-        roleId: string,
-        moduleKey: string,
-        action: PermissionAction
-    ) => {
-        setRoles((prev) =>
-            prev.map((role) => {
-                if (role.id !== roleId) return role;
+    const [getALlRoles, { data: allRolesData, isLoading: allRolesLoading, isUninitialized: allRolesUninitialized, isError: allRolesError }] = useLazyGetAllRolesQuery()
+    const [getAllSidebarLinks, { data: allSidebarLinksData, isLoading: allSidebarLinksLoading, isUninitialized: allSidebarLinksUninitialized, isError: allSidebarLinksError }] = useLazyGetAllSidebarLinksQuery()
 
-                const existing = role.permissions.find((p) => p.key === moduleKey);
+    const {
+        data: sidebarPermissionData,
+        isFetching: sidebarPermissionLoading,
+        isError: sidebarPermissionError,
+    } = useGetSidebarPermissionQuery(
+        selectedRoleId,
+        { skip: !selectedRoleId }
+    );
 
-                if (!existing) {
-                    return {
-                        ...role,
-                        permissions: [
-                            ...role.permissions,
-                            { key: moduleKey, actions: [action] },
-                        ],
-                    };
-                }
 
-                const updatedActions = existing.actions.includes(action)
-                    ? existing.actions.filter((a) => a !== action)
-                    : [...existing.actions, action];
+    const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
 
-                return {
-                    ...role,
-                    permissions: role.permissions.map((p) =>
-                        p.key === moduleKey ? { ...p, actions: updatedActions } : p
-                    ),
-                };
-            })
-        );
-    };
+    useEffect(() => {
+        if (!isLoggedIn) return
+        getALlRoles("allRoles")
+        getAllSidebarLinks("allSidebarLinks")
+    }, [isLoggedIn])
+
+    useEffect(() => {
+        console.log("🚀 ~ RoleManagement ~ data:", allRolesData)
+        console.log("🚀 ~ RoleManagement ~ allSidebarLinksData:", allSidebarLinksData)
+        if (!allSidebarLinksData && !allSidebarLinksError && !allSidebarLinksUninitialized) {
+            setPermissions(allSidebarLinksData?.roles)
+        }
+    }, [allRolesData, allSidebarLinksData])
+
 
     const addRole = () => {
         if (!newRoleName.trim()) return;
-        setRoles((prev) => [
-            ...prev,
-            {
-                id: Date.now().toString(),
-                name: newRoleName,
-                permissions: [],
-            },
-        ]);
+        // setRoles((prev) => [
+        //     ...prev,
+        //     {
+        //         id: Date.now().toString(),
+        //         name: newRoleName,
+        //         permissions: [],
+        //     },
+        // ]);
         setNewRoleName("");
     };
+
+    function manageRole(id: string) {
+        setSelectedRoleId(id);
+    }
+
+    function isPermission(module, action) {
+        if (!sidebarPermissionData?.permission) {
+            console.log(sidebarPermissionData?.permission, "--------------");
+
+            return false
+        }
+        console.log(module);
+        console.log(action);
+
+        console.log(sidebarPermissionData?.permission);
+        const index = sidebarPermissionData?.permission?.findIndex(x => x.sidebar_link_id === module.id)
+
+        const permObjKey = PERMISSION_ACTIONS.find(permission => permission.key === action)?.field
+
+        if (index >= 0) {
+            return sidebarPermissionData?.permission?.[index]?.[permObjKey] ? true : false
+        }
+        return false
+
+    }
 
     return (
         <div className="min-h-screen bg-background">
@@ -214,37 +155,38 @@ export default function RoleManagement() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Role</TableHead>
-                                        <TableHead>Permissions</TableHead>
+                                        {/* <TableHead>Permissions</TableHead> */}
                                         <TableHead className="text-right">Action</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {roles.map((role) => (
-                                        <TableRow key={role.id}>
+                                    {!allRolesLoading && !allRolesUninitialized && !allRolesError && allRolesData.roles.map((role) => {
+                                        return <TableRow key={role.id}>
                                             <TableCell className="font-medium">{role.name}</TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
+                                            {/* <TableCell className="text-sm text-muted-foreground">
                                                 {role.permissions.length === 0
                                                     ? "No permissions"
                                                     : `${role.permissions.length} modules`}
-                                            </TableCell>
+                                            </TableCell> */}
                                             <TableCell className="text-right">
                                                 <Button
                                                     size="sm"
                                                     variant="heroOutline"
-                                                    onClick={() => setSelectedRole(role)}
+                                                    onClick={() => manageRole(role.id)}
                                                 >
                                                     Manage
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
-                                    ))}
+                                    })}
                                 </TableBody>
                             </Table>
                         </div>
                     </section>
 
                     <section className="h-full overflow-y-auto scrollbar-hide p-6 lg:p-8 bg-muted/20">
-                        {selectedRole ? (
+                        {
+                            // selectedRole ? (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -252,38 +194,34 @@ export default function RoleManagement() {
                             >
                                 <div className="flex items-center justify-between mb-4">
                                     <h2 className="text-lg font-semibold text-foreground">
-                                        Permissions – {selectedRole.name}
+                                        Permissions –
                                     </h2>
-                                    <Button size="sm" variant="ghost" onClick={() => setSelectedRole(null)}>
+                                    {/* <Button size="sm" variant="ghost" onClick={() => setSelectedRole(null)}>
                                         Close
-                                    </Button>
+                                    </Button> */}
                                 </div>
 
                                 <div className="space-y-4">
-                                    {SIDEBAR_MODULES.map((module) => (
+                                    {!allSidebarLinksLoading && !allSidebarLinksError && !allRolesUninitialized && allSidebarLinksData.roles.map((module) => (
                                         <div
-                                            key={module.key}
+                                            key={module.id}
                                             className="flex items-center justify-between border border-border rounded-xl p-4"
                                         >
                                             <span className="font-medium text-foreground">
-                                                {module.label}
+                                                {module.link_name}
                                             </span>
                                             <div className="flex items-center gap-6">
                                                 {["read", "write", "delete"].map((action) => (
                                                     <div key={action} className="flex items-center gap-2">
                                                         <Checkbox
-                                                            checked={hasPermission(
-                                                                selectedRole,
-                                                                module.key,
-                                                                action as PermissionAction
-                                                            )}
-                                                            onCheckedChange={() =>
-                                                                togglePermission(
-                                                                    selectedRole.id,
-                                                                    module.key,
-                                                                    action as PermissionAction
-                                                                )
-                                                            }
+                                                            checked={isPermission(module, action)}
+                                                        // onCheckedChange={() =>
+                                                        //     togglePermission(
+                                                        //         selectedRole.id,
+                                                        //         module.key,
+                                                        //         action as PermissionAction
+                                                        //     )
+                                                        // }
                                                         />
                                                         <Label className="text-sm capitalize">{action}</Label>
                                                     </div>
@@ -293,11 +231,12 @@ export default function RoleManagement() {
                                     ))}
                                 </div>
                             </motion.div>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-muted-foreground">
-                                Select a role to manage permissions
-                            </div>
-                        )}
+                            // ) : (
+                            //     <div className="h-full flex items-center justify-center text-muted-foreground">
+                            //         Select a role to manage permissions
+                            //     </div>
+                            // )
+                        }
                     </section>
                 </div>
             </main>

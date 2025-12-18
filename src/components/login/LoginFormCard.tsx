@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { Eye, EyeOff, Mail, ShieldCheck, Zap } from "lucide-react";
 import { supabase } from "../../../supabase/functions/supabase-client.ts";
+import { useDispatch } from "react-redux";
+import { changeLoginStatus } from "@/redux/slices/isLoggedInSlice.ts";
 
 const SUPPORT_EMAIL = "support@atithiflow.com";
 
@@ -27,6 +29,8 @@ const LoginFormCard = () => {
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const dispatch = useDispatch()
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -53,16 +57,15 @@ const LoginFormCard = () => {
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
       const { data, error } = await login()
-      console.log(data.session.access_token);
-      console.log(data.user);
-
-
       setIsLoading(false);
       if (error) {
         setSubmitMessage(error.message);
         return;
       }
+      const authToken = data.session.access_token
+      localStorage.setItem("authToken", authToken)
       setSubmitMessage("Logged in success")
+      dispatch(changeLoginStatus(true))
     }
   };
 

@@ -14,6 +14,8 @@ import Reservation from "./pages/Reservation";
 import { supabase } from "../supabase/functions/supabase-client.ts";
 import { useEffect } from "react";
 import RoleManagement from "./pages/RoleManagement.tsx";
+import { Provider } from 'react-redux'
+import { store } from "./redux/store.ts";
 
 async function login() {
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -37,26 +39,28 @@ const App = () => {
 
   useEffect(() => { login() }, [])
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/platform" element={<Platform />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms-of-service" element={<TermsOfService />} />
-            <Route path="/reservation" element={<Reservation />} />
-            <Route path="/roles" element={<RoleManagement />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <Provider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/platform" element={<Platform />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-of-service" element={<TermsOfService />} />
+              <Route path="/reservation" element={<Reservation />} />
+              <Route path="/roles" element={<RoleManagement />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </Provider>
   )
 };
 

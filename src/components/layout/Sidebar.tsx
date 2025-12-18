@@ -1,11 +1,23 @@
-import React from 'react'
-import { Home, CalendarDays, BedDouble, Settings, Menu } from "lucide-react";
+import React, { useEffect } from 'react'
+import {  Menu, ChevronRight } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from '../ui/button';
 import atithiflowLogo from "@/assets/atithiflow-logo.png";
 import { cn } from "@/lib/utils";
+import { useLazyGetSidebarLinksQuery } from '@/redux/services/hmsApi';
+import { useAppSelector } from '@/redux/hook';
 
 export default function Sidebar() {
+
+    const [sidebar, { data, isLoading, isError, isUninitialized }] = useLazyGetSidebarLinksQuery()
+    const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
+
+    useEffect(() => {
+        if (!isLoggedIn) return
+        sidebar("sidebar")
+    }, [isLoggedIn])
+
+
     return (
         <>
             <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-64 lg:flex-col border-r border-border bg-card z-40">
@@ -18,10 +30,11 @@ export default function Sidebar() {
                 </div>
 
                 <nav className="flex-1 px-4 py-6 space-y-2">
-                    <SidebarLink icon={Home} label="Dashboard" />
-                    <SidebarLink icon={CalendarDays} label="Reservations" active />
-                    <SidebarLink icon={BedDouble} label="Rooms" />
-                    <SidebarLink icon={Settings} label="Settings" />
+                    {
+                        !isLoading && !isError && !isUninitialized && data.sidebarLinks.map(link => {
+                            return <SidebarLink label={link.link_name} />
+                        })
+                    }
                 </nav>
             </aside>
 
@@ -38,10 +51,11 @@ export default function Sidebar() {
                             AtithiFlow
                         </div>
                         <nav className="px-4 py-6 space-y-2">
-                            <SidebarLink icon={Home} label="Dashboard" />
-                            <SidebarLink icon={CalendarDays} label="Reservations" active />
-                            <SidebarLink icon={BedDouble} label="Rooms" />
-                            <SidebarLink icon={Settings} label="Settings" />
+                            {
+                                !isLoading && !isError && !isUninitialized && data.sidebarLinks.map(link => {
+                                    return <SidebarLink label={link.link_name} />
+                                })
+                            }
                         </nav>
                     </SheetContent>
                 </Sheet>
@@ -51,7 +65,7 @@ export default function Sidebar() {
     )
 }
 
-function SidebarLink({ icon: Icon, label, active = false }: any) {
+function SidebarLink({ icon, label, active = false }: any) {
     return (
         <button
             className={cn(
@@ -61,7 +75,7 @@ function SidebarLink({ icon: Icon, label, active = false }: any) {
                     : "text-muted-foreground hover:bg-muted"
             )}
         >
-            <Icon className="h-4 w-4" />
+            <ChevronRight className="h-4 w-4" />
             {label}
         </button>
     );
