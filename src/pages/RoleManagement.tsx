@@ -21,23 +21,39 @@ import {
 } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
-import { useGetSidebarPermissionQuery, useLazyGetAllRolesQuery, useLazyGetAllSidebarLinksQuery } from "@/redux/services/hmsApi";
+import { useCreateRoleMutation, useGetSidebarPermissionQuery, useLazyGetAllRolesQuery, useLazyGetAllSidebarLinksQuery, usePostRoleSidebarLinkMutation } from "@/redux/services/hmsApi";
 import { useAppSelector } from "@/redux/hook";
+import { toast } from "react-toastify";
 
 const PERMISSION_ACTIONS = [
     { key: "read", label: "read", field: "can_read" },
     { key: "create", label: "write", field: "can_create" },
-    { key: "update", label: "update", field: "can_update" },
     { key: "delete", label: "delete", field: "can_delete" },
 ] as const;
 
+type SidebarPermissionPayload = {
+    roleId: string;
+    permissions: {
+        [sidebarLinkId: string]: {
+            can_read: boolean;
+            can_create: boolean;
+            can_update: boolean;
+            can_delete: boolean;
+        };
+    };
+};
+
 
 export default function RoleManagement() {
-    const [roles, setRoles] = useState<[]>();
     const [newRoleName, setNewRoleName] = useState("");
-    const [permissions, setPermissions] = useState([]);
     const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
-
+    const [selectedRoleName, setSelectedRoleName] = useState("")
+    const [sidebarPermissionPayload, setSidebarPermissionPayload] =
+        useState<SidebarPermissionPayload>({
+            roleId: "",
+            permissions: {}
+        });
+    console.log("🚀 ~ RoleManagement ~ sidebarPermissionPayload:", sidebarPermissionPayload)
 
     const [getALlRoles, { data: allRolesData, isLoading: allRolesLoading, isUninitialized: allRolesUninitialized, isError: allRolesError }] = useLazyGetAllRolesQuery()
     const [getAllSidebarLinks, { data: allSidebarLinksData, isLoading: allSidebarLinksLoading, isUninitialized: allSidebarLinksUninitialized, isError: allSidebarLinksError }] = useLazyGetAllSidebarLinksQuery()
@@ -51,6 +67,9 @@ export default function RoleManagement() {
         { skip: !selectedRoleId }
     );
 
+    const [postRoleSidebarLink, { isSuccess: postRoleSidebarSuccess, isError: postRoleSidebarError }] = usePostRoleSidebarLinkMutation()
+
+    const [createRole, { isSuccess: createRoleSuccess, reset }] = useCreateRoleMutation()
 
     const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
 
@@ -60,50 +79,83 @@ export default function RoleManagement() {
         getAllSidebarLinks("allSidebarLinks")
     }, [isLoggedIn])
 
-    useEffect(() => {
-        console.log("🚀 ~ RoleManagement ~ data:", allRolesData)
-        console.log("🚀 ~ RoleManagement ~ allSidebarLinksData:", allSidebarLinksData)
-        if (!allSidebarLinksData && !allSidebarLinksError && !allSidebarLinksUninitialized) {
-            setPermissions(allSidebarLinksData?.roles)
-        }
-    }, [allRolesData, allSidebarLinksData])
-
-
-    const addRole = () => {
+    function addRole() {
         if (!newRoleName.trim()) return;
-        // setRoles((prev) => [
-        //     ...prev,
-        //     {
-        //         id: Date.now().toString(),
-        //         name: newRoleName,
-        //         permissions: [],
-        //     },
-        // ]);
+        const promise = createRole({ roleName: newRoleName }).unwrap()
+        toast.promise(promise, {
+            pending: 'Updating sidebar permissions...',
+            success: 'Sidebar permissions updated successfully',
+            error: 'Failed to update sidebar permissions',
+        })
+        reset()
         setNewRoleName("");
     };
 
-    function manageRole(id: string) {
-        setSelectedRoleId(id);
+    function isChecked(
+        moduleId: number,
+        field: "can_read" | "can_create" | "can_delete"
+    ) {
+        return (
+            sidebarPermissionPayload.permissions[moduleId]?.[field] ?? false
+        );
     }
 
-    function isPermission(module, action) {
-        if (!sidebarPermissionData?.permission) {
-            console.log(sidebarPermissionData?.permission, "--------------");
+    function onPermissionChange(
+        moduleId: number,
+        field: "can_read" | "can_create" | "can_update" | "can_delete",
+        checked: boolean
+    ) {
+        setSidebarPermissionPayload(prev => ({
+            ...prev,
+            permissions: {
+                ...prev.permissions,
+                [moduleId]: {
+                    ...prev.permissions[moduleId],
+                    [field]: checked
+                }
+            }
+        }));
+    }
 
-            return false
-        }
-        console.log(module);
-        console.log(action);
+    useEffect(() => {
+        if (!selectedRoleId || !sidebarPermissionData?.permission) return;
 
-        console.log(sidebarPermissionData?.permission);
-        const index = sidebarPermissionData?.permission?.findIndex(x => x.sidebar_link_id === module.id)
+        const permissions = {};
 
-        const permObjKey = PERMISSION_ACTIONS.find(permission => permission.key === action)?.field
+        sidebarPermissionData.permission.forEach(p => {
+            permissions[p.sidebar_link_id] = {
+                can_read: p.can_read,
+                can_create: p.can_create,
+                can_update: p.can_update,
+                can_delete: p.can_delete
+            };
+        });
 
-        if (index >= 0) {
-            return sidebarPermissionData?.permission?.[index]?.[permObjKey] ? true : false
-        }
-        return false
+        setSidebarPermissionPayload({
+            roleId: selectedRoleId,
+            permissions
+        });
+    }, [selectedRoleId, sidebarPermissionData]);
+
+    async function sidebarPermissionUpdate(): Promise<void> {
+        const { roleId, permissions } = sidebarPermissionPayload;
+
+        const payloads = Object.entries(permissions).map(
+            ([sidebarLinkId, perms]) => ({
+                role_id: Number(roleId),
+                sidebar_link_id: Number(sidebarLinkId),
+                ...perms
+            })
+        );
+        const updatePromise = Promise.all(
+            payloads.map(p => postRoleSidebarLink(p).unwrap())
+        )
+
+        toast.promise(updatePromise, {
+            pending: 'Creating role...',
+            success: 'Role created successfully',
+            error: 'Failed to create role',
+        })
 
     }
 
@@ -172,7 +224,10 @@ export default function RoleManagement() {
                                                 <Button
                                                     size="sm"
                                                     variant="heroOutline"
-                                                    onClick={() => manageRole(role.id)}
+                                                    onClick={() => {
+                                                        setSelectedRoleId(role.id);
+                                                        setSelectedRoleName(role.name);
+                                                    }}
                                                 >
                                                     Manage
                                                 </Button>
@@ -194,11 +249,14 @@ export default function RoleManagement() {
                             >
                                 <div className="flex items-center justify-between mb-4">
                                     <h2 className="text-lg font-semibold text-foreground">
-                                        Permissions –
+                                        {selectedRoleName ? "Permissions –" + selectedRoleName : "Please select role to continue"}
                                     </h2>
-                                    {/* <Button size="sm" variant="ghost" onClick={() => setSelectedRole(null)}>
-                                        Close
-                                    </Button> */}
+                                    <Button size="sm" variant="ghost" disabled>
+                                        Reset
+                                    </Button>
+                                    <Button size="sm" variant="ghost" disabled={!selectedRoleId} onClick={sidebarPermissionUpdate} >
+                                        Update
+                                    </Button>
                                 </div>
 
                                 <div className="space-y-4">
@@ -214,14 +272,15 @@ export default function RoleManagement() {
                                                 {["read", "write", "delete"].map((action) => (
                                                     <div key={action} className="flex items-center gap-2">
                                                         <Checkbox
-                                                            checked={isPermission(module, action)}
-                                                        // onCheckedChange={() =>
-                                                        //     togglePermission(
-                                                        //         selectedRole.id,
-                                                        //         module.key,
-                                                        //         action as PermissionAction
-                                                        //     )
-                                                        // }
+                                                            disabled={!selectedRoleId}
+                                                            checked={isChecked(module.id, PERMISSION_ACTIONS.find(p => p.label === action)?.field)}
+                                                            onCheckedChange={(checked) =>
+                                                                onPermissionChange(
+                                                                    module.id,
+                                                                    PERMISSION_ACTIONS.find(p => p.label === action)?.field,
+                                                                    Boolean(checked)
+                                                                )
+                                                            }
                                                         />
                                                         <Label className="text-sm capitalize">{action}</Label>
                                                     </div>

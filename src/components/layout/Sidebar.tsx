@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react'
-import {  Menu, ChevronRight } from "lucide-react";
+import { Menu, ChevronRight } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from '../ui/button';
 import atithiflowLogo from "@/assets/atithiflow-logo.png";
 import { cn } from "@/lib/utils";
 import { useLazyGetSidebarLinksQuery } from '@/redux/services/hmsApi';
 import { useAppSelector } from '@/redux/hook';
+import { useNavigate } from 'react-router-dom';
 
 export default function Sidebar() {
 
@@ -32,7 +33,7 @@ export default function Sidebar() {
                 <nav className="flex-1 px-4 py-6 space-y-2">
                     {
                         !isLoading && !isError && !isUninitialized && data.sidebarLinks.map(link => {
-                            return <SidebarLink label={link.link_name} />
+                            return <SidebarLink endpoint={link.endpoint} label={link.link_name} keyProp={link.sidebar_link_id} />
                         })
                     }
                 </nav>
@@ -53,7 +54,7 @@ export default function Sidebar() {
                         <nav className="px-4 py-6 space-y-2">
                             {
                                 !isLoading && !isError && !isUninitialized && data.sidebarLinks.map(link => {
-                                    return <SidebarLink label={link.link_name} />
+                                    return <SidebarLink endpoint={link.endpoint} label={link.link_name} keyProp={link.sidebar_link_id} />
                                 })
                             }
                         </nav>
@@ -65,9 +66,13 @@ export default function Sidebar() {
     )
 }
 
-function SidebarLink({ icon, label, active = false }: any) {
+function SidebarLink({ icon, label, active = false, keyProp, endpoint }: any) {
+    console.log("🚀 ~ SidebarLink ~ endpoint:", endpoint)
+    const navigate = useNavigate()
     return (
         <button
+            key={keyProp + label}
+            onClick={() => navigate(endpoint)}
             className={cn(
                 "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
                 active

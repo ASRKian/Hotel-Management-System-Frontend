@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,7 @@ const LoginFormCard = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const dispatch = useDispatch()
+  const navigate = useNavigate()
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -66,6 +67,7 @@ const LoginFormCard = () => {
       localStorage.setItem("authToken", authToken)
       setSubmitMessage("Logged in success")
       dispatch(changeLoginStatus(true))
+      navigate("/properties")
     }
   };
 

@@ -16,11 +16,17 @@ import { useEffect } from "react";
 import RoleManagement from "./pages/RoleManagement.tsx";
 import { Provider } from 'react-redux'
 import { store } from "./redux/store.ts";
+import { ToastContainer } from 'react-toastify';
+import PropertyManagement from "./pages/PropertyManagement.tsx";
+import { LogoSpinner } from "./components/Spinner.tsx";
+import StaffManagement from "./pages/StaffManagment.tsx";
 
 async function login() {
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: "superadmin@atithiflow.com",
-    password: "ChangeMe@123"
+    // email: "superadmin@atithiflow.com",
+    // password: "ChangeMe@123"
+    email: "dummy1@email.com",
+    password: "1234"
   });
 
   if (error) {
@@ -40,6 +46,7 @@ const App = () => {
   useEffect(() => { login() }, [])
   return (
     <Provider store={store}>
+      <ToastContainer/>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
@@ -54,6 +61,9 @@ const App = () => {
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/reservation" element={<Reservation />} />
               <Route path="/roles" element={<RoleManagement />} />
+              <Route path="/properties" element={<PropertyManagement />} />
+              <Route path="/staff" element={<StaffManagement />} />
+              <Route path="/spinner" element={<LogoSpinner />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
