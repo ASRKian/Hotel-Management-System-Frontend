@@ -21,8 +21,13 @@ import {
 } from "@/components/ui/table";
 import { Image as ImageIcon, User } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
-import { useAddStaffMutation, useGetStaffByPropertyQuery, useLazyGetStaffByIdQuery, useUpdateStaffMutation } from "@/redux/services/hmsApi";
+import { useAddStaffMutation, useCreateUserMutation, useGetAllRolesQuery, useGetMyPropertiesQuery, useGetStaffByPropertyQuery, useLazyGetStaffByIdQuery, useUpdateStaffMutation } from "@/redux/services/hmsApi";
 import { toast } from "react-toastify";
+import { useAppSelector } from "@/redux/hook";
+import { normalizeTextInput } from "@/utils/normalizeTextInput";
+import AppHeader from "@/components/layout/AppHeader";
+import { validateStaff } from "@/utils/validators";
+import { selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 
 /* -------------------- Types -------------------- */
 type Staff = {
@@ -44,6 +49,8 @@ const STAFF_INITIAL_VALUE = {
     first_name: "",
     middle_name: "",
     last_name: "",
+    password: "",
+    role_ids: [],
     address: "",
     gender: "",
     marital_status: "",
@@ -65,9 +72,9 @@ const STAFF_INITIAL_VALUE = {
     image: null,
     id_proof: null,
     user_id: "",
+    property_id: ""
 }
 
-/* -------------------- Component -------------------- */
 export default function StaffManagement() {
     const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -77,40 +84,73 @@ export default function StaffManagement() {
     const limit = 10;
 
     const [search, setSearch] = useState("");
-    const [property, setProperty] = useState("");
-    const [statusFilter, setStatusFilter] = useState("");
+    const [selectedPropertyId, setSelectedPropertyId] = useState("");
 
-    const propertyId = "1";
+    const [statusFilter, setStatusFilter] = useState("");
 
     const [staff, setStaff] = useState<any>(STAFF_INITIAL_VALUE);
 
     const debouncedSearch = useDebounce(search, 500);
+    const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
+    const isSuperAdmin = useAppSelector(selectIsSuperAdmin)
 
-    const { data, isLoading } = useGetStaffByPropertyQuery({
-        property_id: propertyId,
+    const { data: myProperties, isLoading: myPropertiesLoading } = useGetMyPropertiesQuery(undefined, {
+        skip: !isLoggedIn
+    })
+
+    const { data: staffData, isLoading } = useGetStaffByPropertyQuery({
+        property_id: selectedPropertyId,
         page,
         limit,
         search: debouncedSearch,
-        property,
+        department: "",
         status: statusFilter,
+    }, {
+        skip: !selectedPropertyId
     });
+    console.log("🚀 ~ StaffManagement ~ data:", staffData, selectedPropertyId)
     const [createStaff, { isLoading: creating }] = useAddStaffMutation();
     const [updateStaff, { isLoading: updating }] = useUpdateStaffMutation();
     const [getStaffById] = useLazyGetStaffByIdQuery();
-
+    const { data: roles } = useGetAllRolesQuery(undefined, {
+        skip: !isLoggedIn
+    })
 
     useEffect(() => {
         setPage(1);
-    }, [debouncedSearch, property, statusFilter]);
+    }, [debouncedSearch, statusFilter]);
 
     useEffect(() => {
         if (sheetOpen) return
         setStaff(STAFF_INITIAL_VALUE)
     }, [sheetOpen])
 
+    useEffect(() => {
+        if (!selectedPropertyId && myProperties?.properties?.length > 0) {
+            setSelectedPropertyId(myProperties.properties[0].id);
+        }
+    }, [myProperties]);
+
+
     const handleSubmit = async () => {
         try {
-            const fd = new FormData();
+            const error = validateStaff(staff, mode, isSuperAdmin);
+
+            if (error) {
+                toast.error(error, {
+                    position: "top-right",
+                    autoClose: 4000,
+                    theme: "light",
+                });
+                return;
+            }
+
+            if (mode === "add" && staff.role_ids.length === 0) {
+                toast.error("Please select a role")
+                return
+            }
+
+            const fd = new FormData()
 
             Object.entries(staff).forEach(([key, value]: any) => {
                 if (
@@ -119,64 +159,51 @@ export default function StaffManagement() {
                     key === "id" ||
                     key === "image" ||
                     key === "id_proof" ||
-                    key === "created_on" ||
-                    key === "updated_on"
+                    key === "roles"
                 ) {
-                    return;
+                    return
                 }
 
-                if (typeof value === "boolean") {
-                    fd.append(key, value ? "true" : "false");
+                if (Array.isArray(value)) {
+                    value.forEach((v) => fd.append(`${key}[]`, v))
                 } else {
-                    fd.append(key, value);
+                    fd.append(key, value)
                 }
-            });
+            })
 
             if (staff.image instanceof File) {
-                fd.append("image", staff.image);
-                fd.append("image_mime", staff.image.type);
+                fd.append("image", staff.image)
+                fd.append("image_mime", staff.image.type)
             }
 
             if (staff.id_proof instanceof File) {
-                fd.append("id_proof", staff.id_proof);
-                fd.append("id_proof_mime", staff.id_proof.type);
+                fd.append("id_proof", staff.id_proof)
+                fd.append("id_proof_mime", staff.id_proof.type)
             }
 
-            // if (mode === "add") {
-            //     await createStaff(fd).unwrap();
-            // } else {
-            //     await updateStaff({
-            //         id: staff.id,
-            //         payload: fd,
-            //     }).unwrap();
-            // }
             const promise =
                 mode === "add"
                     ? createStaff(fd).unwrap()
-                    : updateStaff({
-                        id: staff.id,
-                        payload: fd,
-                    }).unwrap();
+                    : updateStaff({ id: staff.id, payload: fd }).unwrap()
 
             await toast.promise(promise, {
-                pending: mode === "add"
-                    ? "Creating staff..."
-                    : "Updating staff...",
-                success: mode === "add"
-                    ? "Staff created successfully"
-                    : "Staff updated successfully",
-                error: {
-                    render({ data }) {
-                        return "Something went wrong";
-                    },
-                },
-            });
+                pending:
+                    mode === "add"
+                        ? "Creating user & staff..."
+                        : "Updating staff...",
+                success:
+                    mode === "add"
+                        ? "Staff created successfully"
+                        : "Staff updated successfully",
+                error: "Something went wrong",
+            })
 
-            setSheetOpen(false);
+            setSheetOpen(false)
         } catch (err) {
-            console.error("Staff submit failed", err);
+            console.error("Staff submit failed", err)
         }
-    };
+    }
+
 
     const toDateInput = (value?: string) =>
         value ? value.split("T")[0] : "";
@@ -184,10 +211,16 @@ export default function StaffManagement() {
 
     return (
         <div className="min-h-screen bg-background">
+            <AppHeader
+                user={{
+                    name: "",
+                    email: "user@atithiflow.com",
+                }}
+            />
             <Sidebar />
 
-            <main className="lg:ml-64 h-screen overflow-hidden">
-                <section className="h-full overflow-y-auto scrollbar-hide p-6 lg:p-8">
+            <main className="lg:ml-64 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden">
+                <section className="flex-1 overflow-y-auto scrollbar-hide p-6 lg:p-8">
                     {/* Header */}
                     <div className="mb-6 flex items-center justify-between">
                         <div>
@@ -223,16 +256,22 @@ export default function StaffManagement() {
                         {/* Properties Filter */}
                         <div className="space-y-2">
                             <Label>Properties</Label>
+
                             <select
                                 className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                                value={property}
-                                onChange={(e) => setProperty(e.target.value)}
+                                value={selectedPropertyId}
+                                onChange={(e) => setSelectedPropertyId(e.target.value)}
                             >
-                                <option value="">All Departments</option>
-                                <option value="Reception">Reception</option>
-                                <option value="Housekeeping">Housekeeping</option>
-                                <option value="Kitchen">Kitchen</option>
-                                {/* dynamic later */}
+                                <option value="" disabled>
+                                    Select property
+                                </option>
+
+                                {!myPropertiesLoading &&
+                                    myProperties?.properties?.map((property) => (
+                                        <option key={property.id} value={property.id}>
+                                            {property.brand_name}
+                                        </option>
+                                    ))}
                             </select>
                         </div>
 
@@ -263,7 +302,7 @@ export default function StaffManagement() {
                             </TableHeader>
 
                             <TableBody>
-                                {!isLoading && data?.data?.length === 0 && (
+                                {!isLoading && staffData?.data?.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
                                             No staff added yet
@@ -279,7 +318,7 @@ export default function StaffManagement() {
                                     </TableRow>
                                 )}
 
-                                {data?.data?.map((s: Staff, idx: number) => (
+                                {staffData?.data?.map((s: Staff, idx: number) => (
                                     <TableRow key={idx}>
                                         <TableCell className="font-medium">
                                             {s.first_name} {s.last_name}
@@ -302,15 +341,16 @@ export default function StaffManagement() {
 
                                                         const data = await getStaffById(s.id!).unwrap();
                                                         const fullStaff = data?.data
-
                                                         setStaff({
                                                             ...STAFF_INITIAL_VALUE,
                                                             ...fullStaff,
 
+                                                            role_ids: fullStaff.roles?.length
+                                                                ? [String(fullStaff.roles[0].id)]
+                                                                : [],
+
                                                             hire_date: toDateInput(fullStaff.hire_date),
                                                             dob: toDateInput(fullStaff.dob),
-
-                                                            // status: fullStaff.status === "active",
 
                                                             image: null,
                                                             id_proof: null,
@@ -333,7 +373,7 @@ export default function StaffManagement() {
                         {(
                             <div className="flex items-center justify-between px-4 py-3 border-t border-border text-sm">
                                 <span className="text-muted-foreground">
-                                    Page {data?.pagination?.page} of {data?.pagination?.totalPages}
+                                    Page {staffData?.pagination?.page} of {staffData?.pagination?.totalPages}
                                 </span>
 
 
@@ -341,7 +381,7 @@ export default function StaffManagement() {
                                     <Button
                                         size="sm"
                                         variant="heroOutline"
-                                        disabled={data?.pagination?.page === 1}
+                                        disabled={!staffData?.pagination?.page || staffData?.pagination?.page == 1}
                                         onClick={() => setPage((p) => p - 1)}
                                     >
                                         Previous
@@ -350,7 +390,7 @@ export default function StaffManagement() {
                                     <Button
                                         size="sm"
                                         variant="heroOutline"
-                                        disabled={data?.pagination?.page === data?.pagination?.totalPages}
+                                        disabled={staffData?.pagination?.page >= staffData?.pagination?.totalPages}
                                         onClick={() => setPage((p) => p + 1)}
                                     >
                                         Next
@@ -405,11 +445,11 @@ export default function StaffManagement() {
                         {/* Basic Info */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="space-y-2">
-                                <Label>First Name</Label>
+                                <Label>First Name*</Label>
                                 <Input
                                     value={staff.first_name}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, first_name: e.target.value })
+                                        setStaff({ ...staff, first_name: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
@@ -419,64 +459,96 @@ export default function StaffManagement() {
                                 <Input
                                     value={staff.middle_name}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, middle_name: e.target.value })
+                                        setStaff({ ...staff, middle_name: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Last Name</Label>
+                                <Label>Last Name*</Label>
                                 <Input
                                     value={staff.last_name}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, last_name: e.target.value })
+                                        setStaff({ ...staff, last_name: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
                         </div>
 
                         {/* Contact */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="space-y-2">
-                                <Label>Email</Label>
+                                <Label>Email*</Label>
                                 <Input
                                     value={staff.email}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, email: e.target.value })
+                                        setStaff({ ...staff, email: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Phone</Label>
+                                <Label>Phone*</Label>
                                 <Input
                                     value={staff.phone1}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, phone1: e.target.value })
+                                        setStaff({ ...staff, phone1: normalizeTextInput(e.target.value).slice(0, 10) })
+                                    }
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Password*</Label>
+                                <Input
+                                    value={staff.password}
+                                    onChange={(e) =>
+                                        setStaff({ ...staff, password: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label>Emergency Contact</Label>
                                 <Input
                                     value={staff.emergency_contact}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, emergency_contact: e.target.value })
+                                        setStaff({ ...staff, emergency_contact: normalizeTextInput(e.target.value).slice(0, 10) })
                                     }
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Alternate Phone</Label>
+                                <Label>Alternate Phone*</Label>
                                 <Input
                                     value={staff.phone2}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, phone2: e.target.value })
+                                        setStaff({ ...staff, phone2: normalizeTextInput(e.target.value).slice(0, 10) })
                                     }
                                 />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>{isSuperAdmin ? "Property" : "Property*"}</Label>
+
+                                <select
+                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    value={mode === "add" ? staff.property_id : selectedPropertyId}
+                                    onChange={(e) =>
+                                        setStaff({ ...staff, property_id: normalizeTextInput(e.target.value) })
+                                    }
+                                >
+                                    <option value="" disabled>
+                                        Select property
+                                    </option>
+
+                                    {!myPropertiesLoading &&
+                                        myProperties?.properties?.map((property) => (
+                                            <option key={property.id} value={property.id}>
+                                                {property.brand_name}
+                                            </option>
+                                        ))}
+                                </select>
                             </div>
                         </div>
 
@@ -486,7 +558,7 @@ export default function StaffManagement() {
                                 <select
                                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
                                     value={staff.gender}
-                                    onChange={(e) => setStaff({ ...staff, gender: e.target.value })}
+                                    onChange={(e) => setStaff({ ...staff, gender: normalizeTextInput(e.target.value) })}
                                 >
                                     <option value="">Select</option>
                                     <option value="male">Male</option>
@@ -501,7 +573,7 @@ export default function StaffManagement() {
                                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
                                     value={staff.marital_status}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, marital_status: e.target.value })
+                                        setStaff({ ...staff, marital_status: normalizeTextInput(e.target.value) })
                                     }
                                 >
                                     <option value="">Select</option>
@@ -515,7 +587,7 @@ export default function StaffManagement() {
                                 <Input
                                     value={staff.blood_group}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, blood_group: e.target.value })
+                                        setStaff({ ...staff, blood_group: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
@@ -533,7 +605,7 @@ export default function StaffManagement() {
                                             className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
                                             value={staff.id_proof_type}
                                             onChange={(e) =>
-                                                setStaff({ ...staff, id_proof_type: e.target.value })
+                                                setStaff({ ...staff, id_proof_type: normalizeTextInput(e.target.value) })
                                             }
                                         >
                                             <option value="">Select type</option>
@@ -548,7 +620,7 @@ export default function StaffManagement() {
                                         <Input
                                             value={staff.id_number}
                                             onChange={(e) =>
-                                                setStaff({ ...staff, id_number: e.target.value })
+                                                setStaff({ ...staff, id_number: normalizeTextInput(e.target.value) })
                                             }
                                         />
                                     </div>
@@ -584,7 +656,7 @@ export default function StaffManagement() {
                                 className="w-full min-h-[80px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
                                 value={staff.address}
                                 onChange={(e) =>
-                                    setStaff({ ...staff, address: e.target.value })
+                                    setStaff({ ...staff, address: normalizeTextInput(e.target.value) })
                                 }
                             />
                         </div>
@@ -596,7 +668,7 @@ export default function StaffManagement() {
                                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
                                     value={staff.employment_type}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, employment_type: e.target.value })
+                                        setStaff({ ...staff, employment_type: normalizeTextInput(e.target.value) })
                                     }
                                 >
                                     <option value="">Select</option>
@@ -612,7 +684,7 @@ export default function StaffManagement() {
                                     type="date"
                                     value={staff.hire_date}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, hire_date: e.target.value })
+                                        setStaff({ ...staff, hire_date: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
@@ -623,13 +695,13 @@ export default function StaffManagement() {
                                     type="date"
                                     value={staff.dob}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, dob: e.target.value })
+                                        setStaff({ ...staff, dob: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Leave Days</Label>
                                 <Input
@@ -637,7 +709,7 @@ export default function StaffManagement() {
                                     min={0}
                                     value={staff.leave_days}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, leave_days: e.target.value })
+                                        setStaff({ ...staff, leave_days: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
@@ -647,31 +719,31 @@ export default function StaffManagement() {
                                 <Input
                                     value={staff.shift_pattern}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, shift_pattern: e.target.value })
+                                        setStaff({ ...staff, shift_pattern: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
 
-                            <div className="space-y-2">
+                            {/* <div className="space-y-2">
                                 <Label>User Mapping</Label>
                                 <Input
                                     value={staff.user_id}
                                     disabled={mode === "edit"}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, user_id: e.target.value })
+                                        setStaff({ ...staff, user_id: normalizeTextInput(e.target.value)})
                                     }
                                 />
-                            </div>
+                            </div> */}
                         </div>
 
                         {/* Designation */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label>Designation</Label>
                                 <Input
                                     value={staff.designation}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, designation: e.target.value })
+                                        setStaff({ ...staff, designation: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
@@ -681,9 +753,29 @@ export default function StaffManagement() {
                                 <Input
                                     value={staff.department}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, department: e.target.value })
+                                        setStaff({ ...staff, department: normalizeTextInput(e.target.value) })
                                     }
                                 />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Role*</Label>
+                                <select
+                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    value={staff.role_ids[0] || ""}
+                                    onChange={(e) =>
+                                        setStaff({ ...staff, role_ids: normalizeTextInput(e.target.value) ? [normalizeTextInput(e.target.value)] : [] })
+                                    }
+                                >
+                                    <option value="" disabled>Select</option>
+                                    {roles?.roles?.map((role) =>
+                                        role.name !== "SUPER_ADMIN" ? (
+                                            <option value={role.id} key={role.id}>
+                                                {role.name}
+                                            </option>
+                                        ) : null
+                                    )}
+                                </select>
+
                             </div>
                         </div>
 

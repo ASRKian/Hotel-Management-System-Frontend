@@ -21,16 +21,16 @@ export default function Sidebar() {
 
     return (
         <>
-            <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-64 lg:flex-col border-r border-border bg-card z-40">
-                <div className="h-16 flex items-center justify-center border-b border-border cursor-pointer">
-                    <img
+            <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:w-64 lg:flex-col bg-card z-40">
+                <div className="h-14 flex items-center justify-center border-b border-border cursor-pointer">
+                    {/* <img
                         src={atithiflowLogo}
                         alt="AtithiFlow"
                         className="h-8 w-auto"
-                    />
+                    /> */}
                 </div>
 
-                <nav className="flex-1 px-4 py-6 space-y-2">
+                <nav className="flex-1 px-4 py-6 space-y-2 border-r border-border">
                     {
                         !isLoading && !isError && !isUninitialized && data.sidebarLinks.map(link => {
                             return <SidebarLink endpoint={link.endpoint} label={link.link_name} keyProp={link.sidebar_link_id} />

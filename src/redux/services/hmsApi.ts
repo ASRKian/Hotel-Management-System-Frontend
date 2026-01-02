@@ -12,8 +12,55 @@ export const hmsApi = createApi({
     "Staff",
     "StaffImage",
     "StaffIdProof",
+    "Me",
+    "Users",
+    "Rooms",
+    "Staff",
+    "Package"
   ],
   endpoints: (builder) => ({
+
+    getMe: builder.query<any, void>({
+      query: () => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: "/users/me",
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        }
+      },
+      providesTags: ["Me"]
+    }),
+
+    createUser: builder.mutation<any, any>({
+      query: ({ email, password, role_ids }) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: "/users",
+          method: "POST",
+          body: { email, password, role_ids },
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        }
+      }
+    }),
+
+    getUsersByRole: builder.query<any, any>({
+      query: (role = "ADMIN") => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/users/by-role/${role}`,
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        }
+      }
+    }),
+
     getAllRoles: builder.query<any, any>({
       query: () => {
         const authToken = localStorage.getItem("authToken")
@@ -46,7 +93,7 @@ export const hmsApi = createApi({
       query: () => {
         const authToken = localStorage.getItem("authToken")
         return {
-          url: "/sidebarLink",
+          url: "/sidebar-link",
           method: "GET",
           headers: {
             Authorization: `Bearer ${authToken}`
@@ -128,6 +175,31 @@ export const hmsApi = createApi({
           : [{ type: "Properties", id: "LIST" }],
     }),
 
+    getMyProperties: builder.query<any, any>({
+      query: () => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/properties/get-my-properties`,
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        }
+      },
+
+      providesTags: (result) =>
+        result?.data
+          ? [
+            ...result.data.map((item: any) => ({
+              type: "Properties" as const,
+              id: item.id,
+            })),
+
+            { type: "Properties", id: "LIST" },
+          ]
+          : [{ type: "Properties", id: "LIST" }],
+    }),
+
     updateProperties: builder.mutation<any, any>({
       query: ({ id, payload }) => {
         const authToken = localStorage.getItem("authToken")
@@ -151,6 +223,22 @@ export const hmsApi = createApi({
         const authToken = localStorage.getItem("authToken")
         return {
           url: "/properties",
+          method: "POST",
+          body: payload,
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      },
+      invalidatesTags: [{ type: 'Properties', id: 'LIST' }],
+    }),
+
+    addPropertyBySuperAdmin: builder.mutation<any, any>({
+      query: (payload) => {
+        const authToken = localStorage.getItem("authToken")
+        const owner_user_id = payload.get("owner_user_id")
+        return {
+          url: `properties/by-owner/${owner_user_id}`,
           method: "POST",
           body: payload,
           headers: {
@@ -192,7 +280,7 @@ export const hmsApi = createApi({
         return {
           url: `/property-floors/${payload.property_id}`,
           method: "POST",
-          body: payload.floors,
+          body: payload,
           headers: {
             Authorization: `Bearer ${authToken}`,
           },
@@ -202,6 +290,64 @@ export const hmsApi = createApi({
       invalidatesTags: (result, error, { property_id }) => [
         { type: "PropertyFloors", id: property_id },
       ],
+    }),
+
+    bulkUpsertRooms: builder.mutation({
+      query: (payload) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/rooms`,
+          method: "POST",
+          body: payload,
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      }
+    }),
+
+    bulkUpdateRooms: builder.mutation({
+      query: (payload) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/rooms`,
+          method: "PATCH",
+          body: payload,
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      },
+      invalidatesTags: ["Rooms"]
+    }),
+
+    getRooms: builder.query({
+      query: (propertyId) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/rooms?propertyId=${propertyId}`,
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      },
+      providesTags: ["Rooms"]
+    }),
+
+    addRoom: builder.mutation({
+      query: (payload) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/rooms/single-room`,
+          method: "POST",
+          body: payload,
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      },
+      invalidatesTags: ["Rooms"]
     }),
 
     getStaff: builder.query<any, any>({
@@ -369,7 +515,143 @@ export const hmsApi = createApi({
           : [{ type: "Staff", id: "LIST" }],
     }),
 
+    getPackageById: builder.query({
+      query: ({ packageId }) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/packages/${packageId}`,
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      }
+    }),
+
+    getPackagesByProperty: builder.query({
+      query: ({ propertyId }) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/packages?property_id=${propertyId}`,
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      },
+      providesTags: ["Package"]
+    }),
+
+    createPackage: builder.mutation({
+      query: (payload) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/packages`,
+          method: "POST",
+          body: payload,
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      },
+      invalidatesTags: ["Package"]
+    }),
+
+    getPackagesByUser: builder.query({
+      query: (payload) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/packages/user`,
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      },
+    }),
+
+    updatePackage: builder.mutation({
+      query: ({ payload, packageId }) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/packages/${packageId}`,
+          method: "PATCH",
+          body: payload,
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      },
+      invalidatesTags: ["Package"]
+    }),
+
+    deactivatePackage: builder.mutation({
+      query: (packageId) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/packages/${packageId}`,
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      }
+    }),
+
+    availableRooms: builder.query({
+      query: ({ propertyId, arrivalDate, departureDate }) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/rooms/available?propertyId=${propertyId}&arrivalDate=${arrivalDate}&departureDate=${departureDate}`,
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      }
+    }),
+
+    createBooking: builder.mutation({
+      query: (payload) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/bookings`,
+          method: "POST",
+          body: payload,
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      }
+    }),
+
+    getBooking: builder.query({
+      query: ({ propertyId, fromDate, toDate }) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/bookings?propertyId=${propertyId}&fromDate=${fromDate}&toDate=${toDate}`,
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      }
+    }),
+
+    getPropertyTax: builder.query({
+      query: (propertyId) => {
+        const authToken = localStorage.getItem("authToken")
+        return {
+          url: `/properties/${propertyId}/tax`,
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      }
+    }),
+
   }),
 })
 
-export const { useLazyGetAllRolesQuery, useLazyGetSidebarLinksQuery, useLazyGetAllSidebarLinksQuery, useLazyGetSidebarPermissionQuery, useGetSidebarPermissionQuery, usePostRoleSidebarLinkMutation, useCreateRoleMutation, useGetPropertiesQuery, useUpdatePropertiesMutation, useAddPropertyMutation, useGetPropertyFloorsQuery, useLazyGetPropertyFloorsQuery, useBulkUpsertPropertyFloorsMutation, useGetStaffQuery, useGetStaffByIdQuery, useAddStaffMutation, useUpdateStaffMutation, useGetStaffImageQuery, useGetStaffIdProofQuery, useGetStaffByPropertyQuery, useLazyGetStaffByPropertyQuery,useLazyGetStaffByIdQuery } = hmsApi
+export const { useLazyGetAllRolesQuery, useLazyGetSidebarLinksQuery, useLazyGetAllSidebarLinksQuery, useLazyGetSidebarPermissionQuery, useGetSidebarPermissionQuery, usePostRoleSidebarLinkMutation, useCreateRoleMutation, useGetPropertiesQuery, useUpdatePropertiesMutation, useAddPropertyMutation, useAddPropertyBySuperAdminMutation, useGetPropertyFloorsQuery, useLazyGetPropertyFloorsQuery, useBulkUpsertPropertyFloorsMutation, useGetStaffQuery, useGetStaffByIdQuery, useAddStaffMutation, useUpdateStaffMutation, useGetStaffImageQuery, useGetStaffIdProofQuery, useGetStaffByPropertyQuery, useLazyGetStaffByPropertyQuery, useLazyGetStaffByIdQuery, useGetMeQuery, useLazyGetMeQuery, useLazyGetUsersByRoleQuery, useGetAllRolesQuery, useCreateUserMutation, useGetMyPropertiesQuery, useGetRoomsQuery, useBulkUpdateRoomsMutation, useBulkUpsertRoomsMutation, useGetPackageByIdQuery, useGetPackagesByPropertyQuery, useCreatePackageMutation, useUpdatePackageMutation, useDeactivatePackageMutation, useAddRoomMutation, useGetPackagesByUserQuery, useGetBookingQuery, useAvailableRoomsQuery, useCreateBookingMutation, useGetPropertyTaxQuery } = hmsApi

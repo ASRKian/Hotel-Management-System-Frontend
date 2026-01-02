@@ -16,7 +16,7 @@ import {
 import { Eye, EyeOff, Mail, ShieldCheck, Zap } from "lucide-react";
 import { supabase } from "../../../supabase/functions/supabase-client.ts";
 import { useDispatch } from "react-redux";
-import { changeLoginStatus } from "@/redux/slices/isLoggedInSlice.ts";
+import { loginSuccess } from "@/redux/slices/isLoggedInSlice.ts";
 
 const SUPPORT_EMAIL = "support@atithiflow.com";
 
@@ -66,7 +66,7 @@ const LoginFormCard = () => {
       const authToken = data.session.access_token
       localStorage.setItem("authToken", authToken)
       setSubmitMessage("Logged in success")
-      dispatch(changeLoginStatus(true))
+      dispatch(loginSuccess())
       navigate("/properties")
     }
   };

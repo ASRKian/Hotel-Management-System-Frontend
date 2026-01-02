@@ -14,19 +14,20 @@ import Reservation from "./pages/Reservation";
 import { supabase } from "../supabase/functions/supabase-client.ts";
 import { useEffect } from "react";
 import RoleManagement from "./pages/RoleManagement.tsx";
-import { Provider } from 'react-redux'
-import { store } from "./redux/store.ts";
 import { ToastContainer } from 'react-toastify';
 import PropertyManagement from "./pages/PropertyManagement.tsx";
 import { LogoSpinner } from "./components/Spinner.tsx";
 import StaffManagement from "./pages/StaffManagment.tsx";
+import { useAuthBootstrap } from "./hooks/useAuthBootstrap.ts";
+import RoomsByFloor from "./pages/RoomsByFloor.tsx";
+import PackageManagement from "./pages/PackageManagement.tsx";
 
 async function login() {
   const { data, error } = await supabase.auth.signInWithPassword({
-    // email: "superadmin@atithiflow.com",
-    // password: "ChangeMe@123"
-    email: "dummy1@email.com",
-    password: "1234"
+    email: "superadmin@atithiflow.com",
+    password: "ChangeMe@123"
+    // email: "newuser@email.com",
+    // password: "1234"
   });
 
   if (error) {
@@ -43,34 +44,37 @@ const queryClient = new QueryClient();
 
 const App = () => {
 
+  useAuthBootstrap()
+
+
   useEffect(() => { login() }, [])
   return (
-    <Provider store={store}>
-      <ToastContainer/>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/platform" element={<Platform />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-              <Route path="/terms-of-service" element={<TermsOfService />} />
-              <Route path="/reservation" element={<Reservation />} />
-              <Route path="/roles" element={<RoleManagement />} />
-              <Route path="/properties" element={<PropertyManagement />} />
-              <Route path="/staff" element={<StaffManagement />} />
-              <Route path="/spinner" element={<LogoSpinner />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </Provider>
+    <QueryClientProvider client={queryClient}>
+      <ToastContainer />
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/platform" element={<Platform />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/reservation" element={<Reservation />} />
+            <Route path="/roles" element={<RoleManagement />} />
+            <Route path="/properties" element={<PropertyManagement />} />
+            <Route path="/staff" element={<StaffManagement />} />
+            <Route path="/property-rooms" element={<RoomsByFloor />} />
+            <Route path="/packages" element={<PackageManagement />} />
+            <Route path="/spinner" element={<LogoSpinner />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
   )
 };
 

@@ -20,9 +20,14 @@ import {
 } from "@/components/ui/table";
 import { Building2, Phone, Mail, Image as ImageIcon } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
-import { useAddPropertyMutation, useBulkUpsertPropertyFloorsMutation, useGetPropertiesQuery, useGetPropertyFloorsQuery, useUpdatePropertiesMutation } from "@/redux/services/hmsApi";
+import { useAddPropertyBySuperAdminMutation, useAddPropertyMutation, useBulkUpsertPropertyFloorsMutation, useGetMeQuery, useGetPropertiesQuery, useGetPropertyFloorsQuery, useLazyGetUsersByRoleQuery, useUpdatePropertiesMutation } from "@/redux/services/hmsApi";
 import { useDebounce } from "@/hooks/use-debounce";
 import { toast } from "react-toastify";
+import { useAppSelector } from "@/redux/hook";
+import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
+import { normalizeTextInput } from "@/utils/normalizeTextInput";
+import { useNavigate } from "react-router-dom";
+import AppHeader from "@/components/layout/AppHeader";
 
 // ---- Types ----
 type Property = {
@@ -75,7 +80,7 @@ const EMPTY_PROPERTY = {
         floor_number: number;
         total_rooms: number;
     }[],
-
+    owner_user_id: ""
 };
 
 
@@ -93,13 +98,19 @@ export default function PropertyManagement() {
     const [city, setCity] = useState("");
     const [stateFilter, setStateFilter] = useState("");
     const [country, setCountry] = useState("");
-
+    const [updatingPropertyIds, setUpdatingPropertyIds] = useState<Set<string>>(new Set());
     const [newProperty, setNewProperty] = useState(EMPTY_PROPERTY);
+    const [originalProperty, setOriginalProperty] = useState<any>(null);
 
     const debouncedSearch = useDebounce(search, 500)
+    // const isLoggedIn = useSelector((state: any) => state.isLoggedIn.value);
+    const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
 
-    const [addProperty, { isLoading, isSuccess }] = useAddPropertyMutation()
-    const [updateProperty, { isSuccess: propertyUpdateSuccess, isError: propertyUpdateError, isUninitialized: propertyUpdateUninitialized }] = useUpdatePropertiesMutation()
+    const navigate = useNavigate()
+
+    const [addProperty] = useAddPropertyMutation()
+    const [addPropertySuperAdmin] = useAddPropertyBySuperAdminMutation()
+    const [updateProperty] = useUpdatePropertiesMutation()
     const {
         data: properties,
         isLoading: propertiesLoading,
@@ -121,7 +132,19 @@ export default function PropertyManagement() {
     const floors = floorsResponse?.floors ?? [];
 
     const [bulkUpsertFloors] = useBulkUpsertPropertyFloorsMutation()
-    console.log("🚀 ~ PropertyManagement ~ newProperty:", newProperty.floors, floors)
+
+    const [getUsers, { data: users }] = useLazyGetUsersByRoleQuery()
+    const isSuperAdmin = useAppSelector(selectIsSuperAdmin)
+    const isOwner = useAppSelector(selectIsOwner)
+
+    useEffect(() => {
+        if (!isLoggedIn) return
+        if (isSuperAdmin) {
+            getUsers("owner")
+        } else if (isOwner) {
+            getUsers("admin")
+        }
+    }, [isLoggedIn, isSuperAdmin, getUsers])
 
     useEffect(() => {
         if (mode === "edit" && floors.length > 0) {
@@ -146,12 +169,25 @@ export default function PropertyManagement() {
         }
     }, [newProperty.total_floors, mode]);
 
+    const toggleActive = async (id: string, is_active: boolean) => {
+        setUpdatingPropertyIds(prev => new Set(prev).add(id));
 
-
-    const toggleActive = (id: string, is_active: boolean) => {
-        const payload = { is_active }
-        updateProperty({ id, payload })
+        try {
+            await updateProperty({
+                id,
+                payload: { is_active },
+            }).unwrap();
+        } catch (err) {
+            toast.error("Failed to update property status");
+        } finally {
+            setUpdatingPropertyIds(prev => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
+        }
     };
+
 
     function buildPropertyFormData(payload: any) {
         const fd = new FormData()
@@ -194,6 +230,7 @@ export default function PropertyManagement() {
             fd.append('image', payload.image)
             fd.append('image_mime', payload.image.type)
         }
+        if (payload.owner_user_id) fd.append("owner_user_id", payload.owner_user_id)
 
         return fd
     }
@@ -353,7 +390,7 @@ export default function PropertyManagement() {
 
         const promise =
             mode === 'add'
-                ? addProperty(formData).unwrap()
+                ? (isSuperAdmin && newProperty.owner_user_id) ? addPropertySuperAdmin(formData).unwrap() : addProperty(formData).unwrap()
                 : updateProperty({
                     id: selectedProperty.id,
                     payload: formData,
@@ -376,7 +413,13 @@ export default function PropertyManagement() {
                 floor_number: f.floor_number,
                 rooms_count: f.total_rooms,
             })),
+            prefix: newProperty.serial_suffix
         }).unwrap();
+        if (mode === "add") {
+            navigate("/property-rooms", {
+                state: { propertyId: id }
+            })
+        }
         setSheetOpen(false)
     }
 
@@ -401,7 +444,7 @@ export default function PropertyManagement() {
 
             floors = floors.map((f, i) => ({
                 ...f,
-                floor_number: i + 1,
+                floor_number: i,
             }));
 
             return {
@@ -412,11 +455,34 @@ export default function PropertyManagement() {
         });
     }
 
+    function normalizeForCompare(payload: any) {
+        const clone = { ...payload };
+
+        delete clone.id;
+        delete clone.image;
+        delete clone.floors;
+
+        return clone;
+    }
+
+    const isDirty =
+        mode === "edit" &&
+        originalProperty &&
+        JSON.stringify(normalizeForCompare(originalProperty)) !==
+        JSON.stringify(normalizeForCompare(newProperty));
+
     return (
         <div className="min-h-screen bg-background">
+            <AppHeader
+                user={{
+                    name: "",
+                    email: "user@atithiflow.com",
+                }}
+            />
             <Sidebar />
-            <main className="lg:ml-64 h-screen overflow-hidden">
-                <section className="h-full overflow-y-auto scrollbar-hide p-6 lg:p-8">
+            {/* <main className="lg:ml-64 h-screen overflow-hidden"> */}
+            <main className="lg:ml-64 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden">
+                <section className="flex-1 overflow-y-auto scrollbar-hide p-6 lg:p-8">
                     <div className="mb-6 flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-foreground">Properties</h1>
@@ -505,6 +571,7 @@ export default function PropertyManagement() {
                                             </p>
                                         </TableCell>
                                         <PropertyStatusCell
+                                            isUpdating={updatingPropertyIds.has(property.id)}
                                             key={property.id}
                                             property={property}
                                             toggleActive={toggleActive}
@@ -513,19 +580,23 @@ export default function PropertyManagement() {
                                             <Button
                                                 size="sm"
                                                 variant="heroOutline"
+                                                disabled={updatingPropertyIds.has(property.id)}
                                                 onClick={() => {
                                                     setMode("edit");
                                                     setSelectedProperty(property);
-                                                    setNewProperty({
+
+                                                    const prepared = {
                                                         ...EMPTY_PROPERTY,
                                                         ...property,
                                                         floors: [],
                                                         total_floors: property.total_floors ?? 0,
-                                                    });
+                                                        owner_user_id: property.owner_user_id ?? "",
+                                                    };
 
+                                                    setNewProperty(prepared);
+                                                    setOriginalProperty(JSON.parse(JSON.stringify(prepared))); // ✅ snapshot
                                                     setSheetOpen(true);
                                                 }}
-
                                             >
                                                 Manage
                                             </Button>
@@ -634,31 +705,56 @@ export default function PropertyManagement() {
                                 required
                                 value={newProperty.brand_name}
                                 onChange={(e) =>
-                                    setNewProperty({ ...newProperty, brand_name: e.target.value })
+                                    setNewProperty({ ...newProperty, brand_name: normalizeTextInput(e.target.value) })
                                 }
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className={`grid grid-cols-1 sm:grid-cols-${(isSuperAdmin || isOwner) ? 3 : 2} gap-4`}>
                             <div className="space-y-2">
                                 <Label>Serial Suffix</Label>
                                 <Input
                                     value={newProperty.serial_suffix}
                                     onChange={(e) =>
-                                        setNewProperty({ ...newProperty, serial_number: e.target.value })
+                                        setNewProperty({ ...newProperty, serial_suffix: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Serial Number*</Label>
-                                <Input
+                                <Label>Room Serial Number*</Label>
+                                <select
                                     required
+                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
                                     value={newProperty.serial_number}
                                     onChange={(e) =>
-                                        setNewProperty({ ...newProperty, serial_number: e.target.value })
+                                        setNewProperty({
+                                            ...newProperty,
+                                            serial_number: e.target.value,
+                                        })
                                     }
-                                />
+                                >
+                                    <option value="" disabled>
+                                        Select serial number
+                                    </option>
+                                    <option value="001">001</option>
+                                    <option value="101">101</option>
+                                    <option value="201">201</option>
+                                </select>
+
                             </div>
+                            {(isSuperAdmin) && <div className="space-y-2">
+                                <Label>Property {isSuperAdmin ? "Owner" : "Admin"}</Label>
+                                <select
+                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    value={newProperty.owner_user_id}
+                                    onChange={(e) => setNewProperty({ ...newProperty, owner_user_id: normalizeTextInput(e.target.value) })}
+                                >
+                                    <option value={null}>No {isSuperAdmin ? "Owner" : "Admin"}</option>
+                                    {users?.users?.map((user, i) => {
+                                        return <option key={i} value={user.user_id}>{user.email}</option>
+                                    })}
+                                </select>
+                            </div>}
 
                         </div>
 
@@ -669,7 +765,7 @@ export default function PropertyManagement() {
                                 required
                                 value={newProperty.address_line_1}
                                 onChange={(e) =>
-                                    setNewProperty({ ...newProperty, address_line_1: e.target.value })
+                                    setNewProperty({ ...newProperty, address_line_1: normalizeTextInput(e.target.value) })
                                 }
                             />
                         </div>
@@ -679,7 +775,7 @@ export default function PropertyManagement() {
                             <Input
                                 value={newProperty.address_line_2}
                                 onChange={(e) =>
-                                    setNewProperty({ ...newProperty, address_line_2: e.target.value })
+                                    setNewProperty({ ...newProperty, address_line_2: normalizeTextInput(e.target.value) })
                                 }
                             />
                         </div>
@@ -690,7 +786,7 @@ export default function PropertyManagement() {
                                 <Input
                                     required
                                     value={newProperty.city}
-                                    onChange={(e) => setNewProperty({ ...newProperty, city: e.target.value })}
+                                    onChange={(e) => setNewProperty({ ...newProperty, city: normalizeTextInput(e.target.value) })}
                                 />
                             </div>
 
@@ -699,7 +795,7 @@ export default function PropertyManagement() {
                                 <Input
                                     required
                                     value={newProperty.state}
-                                    onChange={(e) => setNewProperty({ ...newProperty, state: e.target.value })}
+                                    onChange={(e) => setNewProperty({ ...newProperty, state: normalizeTextInput(e.target.value) })}
                                 />
                             </div>
 
@@ -708,7 +804,7 @@ export default function PropertyManagement() {
                                 <Input
                                     required
                                     value={newProperty.postal_code}
-                                    onChange={(e) => setNewProperty({ ...newProperty, postal_code: e.target.value })}
+                                    onChange={(e) => setNewProperty({ ...newProperty, postal_code: normalizeTextInput(e.target.value) })}
                                 />
                             </div>
                         </div>
@@ -718,14 +814,14 @@ export default function PropertyManagement() {
                                 <Input
                                     required
                                     value={newProperty.phone}
-                                    onChange={(e) => setNewProperty({ ...newProperty, phone: e.target.value })}
+                                    onChange={(e) => setNewProperty({ ...newProperty, phone: normalizeTextInput(e.target.value) })}
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label>Alternative Phone</Label>
                                 <Input
                                     value={newProperty.phone2}
-                                    onChange={(e) => setNewProperty({ ...newProperty, phone2: e.target.value })}
+                                    onChange={(e) => setNewProperty({ ...newProperty, phone2: normalizeTextInput(e.target.value) })}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -733,7 +829,7 @@ export default function PropertyManagement() {
                                 <Input
                                     required
                                     value={newProperty.email}
-                                    onChange={(e) => setNewProperty({ ...newProperty, email: e.target.value })}
+                                    onChange={(e) => setNewProperty({ ...newProperty, email: normalizeTextInput(e.target.value) })}
                                 />
                             </div>
                         </div>
@@ -743,24 +839,25 @@ export default function PropertyManagement() {
                             <div className="space-y-2">
                                 <Label>Check-in Time*</Label>
                                 <Input type="time" value={newProperty.checkin_time}
-                                    onChange={(e) => setNewProperty({ ...newProperty, checkin_time: e.target.value })} />
+                                    onChange={(e) => setNewProperty({ ...newProperty, checkin_time: normalizeTextInput(e.target.value) })} />
                             </div>
 
                             <div className="space-y-2">
                                 <Label>Check-out Time*</Label>
                                 <Input type="time" value={newProperty.checkout_time}
-                                    onChange={(e) => setNewProperty({ ...newProperty, checkout_time: e.target.value })} />
+                                    onChange={(e) => setNewProperty({ ...newProperty, checkout_time: normalizeTextInput(e.target.value) })} />
                             </div>
                         </div>
 
                         {/* Numbers */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             {/* <Input type="number" placeholder="Total Rooms"
-                                onChange={(e) => setNewProperty({ ...newProperty, total_rooms: e.target.value })} /> */}
+                                onChange={(e) => setNewProperty({ ...newProperty, total_rooms: normalizeTextInput(e.target.value)})} /> */}
                             <div className="space-y-2">
                                 <Label>Total Floors*</Label>
                                 <Input
                                     type="number"
+                                    disabled={mode === "edit"}
                                     min={1}
                                     value={newProperty.total_floors}
                                     onChange={(e) => {
@@ -773,12 +870,12 @@ export default function PropertyManagement() {
                             <div className="space-y-2">
                                 <Label>GST %</Label>
                                 <Input type="number" min={0} value={newProperty.gst}
-                                    onChange={(e) => setNewProperty({ ...newProperty, gst: +e.target.value })} />
+                                    onChange={(e) => setNewProperty({ ...newProperty, gst: +normalizeTextInput(e.target.value) })} />
                             </div>
                             <div className="space-y-2">
                                 <Label>Room Tax %</Label>
                                 <Input type="number" min={0} value={newProperty.room_tax_rate}
-                                    onChange={(e) => setNewProperty({ ...newProperty, room_tax_rate: +e.target.value })} />
+                                    onChange={(e) => setNewProperty({ ...newProperty, room_tax_rate: +normalizeTextInput(e.target.value) })} />
                             </div>
                         </div>
 
@@ -810,6 +907,7 @@ export default function PropertyManagement() {
                                             type="number"
                                             className="border-none"
                                             min={0}
+                                            disabled={mode === "edit"}
                                             value={floor.total_rooms}
                                             onChange={(e) => {
                                                 const value = Number(e.target.value) || 0;
@@ -836,6 +934,7 @@ export default function PropertyManagement() {
                                                         Math.max((newProperty.total_floors || 0) - 1, 0)
                                                     );
                                                 }}
+                                                disabled={mode === "edit"}
                                             >
                                                 Remove
                                             </Button>
@@ -852,7 +951,7 @@ export default function PropertyManagement() {
                             </div>
 
                             {/* Add Floor Button */}
-                            <Button
+                            {mode === "add" && <Button
                                 size="sm"
                                 variant="heroOutline"
                                 onClick={() => {
@@ -860,7 +959,18 @@ export default function PropertyManagement() {
                                 }}
                             >
                                 Add Floor
-                            </Button>
+                            </Button>}
+                            {mode === "edit" && <Button
+                                size="sm"
+                                variant="heroOutline"
+                                onClick={() => {
+                                    navigate("/property-rooms", {
+                                        state: { propertyId: selectedProperty.id }
+                                    })
+                                }}
+                            >
+                                Manage Rooms
+                            </Button>}
                         </div>
 
 
@@ -871,7 +981,7 @@ export default function PropertyManagement() {
                                 className="w-full min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                 value={newProperty.smoking_policy}
                                 onChange={(e) =>
-                                    setNewProperty({ ...newProperty, smoking_policy: e.target.value })
+                                    setNewProperty({ ...newProperty, smoking_policy: normalizeTextInput(e.target.value) })
                                 }
                             />
                         </div>
@@ -882,7 +992,7 @@ export default function PropertyManagement() {
                                 className="w-full min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                 value={newProperty.cancellation_policy}
                                 onChange={(e) =>
-                                    setNewProperty({ ...newProperty, cancellation_policy: e.target.value })
+                                    setNewProperty({ ...newProperty, cancellation_policy: normalizeTextInput(e.target.value) })
                                 }
                             />
                         </div>
@@ -919,9 +1029,21 @@ export default function PropertyManagement() {
                                 Cancel
                             </Button>
 
-                            <Button variant="hero" onClick={handleSubmitProperty}>
+                            {/* <Button
+                                variant="ghost"
+                                onClick={() => setNewProperty(originalProperty)}
+                            >
+                                Reset
+                            </Button> */}
+
+                            <Button
+                                variant="hero"
+                                onClick={handleSubmitProperty}
+                                disabled={mode === "edit" && !isDirty}
+                            >
                                 {mode === "add" ? "Create Property" : "Save Changes"}
                             </Button>
+
                         </div>
                     </motion.div>
                 </SheetContent>
@@ -931,7 +1053,7 @@ export default function PropertyManagement() {
     );
 }
 
-function PropertyStatusCell({ property, toggleActive }) {
+function PropertyStatusCell({ property, toggleActive, isUpdating }) {
     const [isActive, setIsActive] = useState(property.is_active);
 
     // Sync when parent data changes (important!)
@@ -939,7 +1061,7 @@ function PropertyStatusCell({ property, toggleActive }) {
         setIsActive(property.is_active);
     }, [property.is_active]);
 
-    const debouncedIsActive = useDebounce(isActive, 500);
+    const debouncedIsActive = useDebounce(isActive, 0);
 
     useEffect(() => {
         if (debouncedIsActive !== property.is_active) {
@@ -951,6 +1073,7 @@ function PropertyStatusCell({ property, toggleActive }) {
         <TableCell>
             <div className="flex items-center gap-2">
                 <Switch
+                    disabled={isUpdating}
                     checked={isActive}
                     onCheckedChange={setIsActive}
                 />
