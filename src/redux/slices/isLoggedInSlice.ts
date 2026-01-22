@@ -3,11 +3,13 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 export interface AuthState {
     value: boolean;
     meLoaded: boolean;
+    apiLoaded: boolean
 }
 
 const initialState: AuthState = {
     value: true,
     meLoaded: false,
+    apiLoaded: false
 };
 
 const authSlice = createSlice({
@@ -22,14 +24,18 @@ const authSlice = createSlice({
         logout: (state) => {
             state.value = false;
             state.meLoaded = false;
-            localStorage.removeItem("authToken");
+            // state.apiLoaded = false;
+            localStorage.clear();
         },
 
         setMeLoaded: (state) => {
             state.meLoaded = true;
         },
 
-        // optional: restore session on refresh
+        setApiLoaded: (state, action: PayloadAction<boolean>) => {
+            state.apiLoaded = action.payload
+        },
+
         setLoggedInFromStorage: (state, action: PayloadAction<boolean>) => {
             state.value = action.payload;
         },
@@ -40,7 +46,8 @@ export const {
     loginSuccess,
     logout,
     setMeLoaded,
-    setLoggedInFromStorage
+    setLoggedInFromStorage,
+    setApiLoaded
 } = authSlice.actions;
 
 export default authSlice.reducer;

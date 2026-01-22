@@ -27,7 +27,8 @@ import { useAppSelector } from "@/redux/hook";
 import { normalizeTextInput } from "@/utils/normalizeTextInput";
 import AppHeader from "@/components/layout/AppHeader";
 import { validateStaff } from "@/utils/validators";
-import { selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
+import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
+import DatePicker from "react-datepicker";
 
 /* -------------------- Types -------------------- */
 type Staff = {
@@ -59,6 +60,11 @@ const STAFF_INITIAL_VALUE = {
     phone1: "",
     phone2: "",
     emergency_contact: "",
+    emergency_contact_name: "",
+    emergency_contact_2: "",
+    emergency_contact_name_2: "",
+    emergency_contact_relation: "",
+    emergency_contact_relation_2: "",
     designation: "",
     department: "",
     hire_date: "",
@@ -93,6 +99,7 @@ export default function StaffManagement() {
     const debouncedSearch = useDebounce(search, 500);
     const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
     const isSuperAdmin = useAppSelector(selectIsSuperAdmin)
+    const isOwner = useAppSelector(selectIsOwner)
 
     const { data: myProperties, isLoading: myPropertiesLoading } = useGetMyPropertiesQuery(undefined, {
         skip: !isLoggedIn
@@ -108,7 +115,7 @@ export default function StaffManagement() {
     }, {
         skip: !selectedPropertyId
     });
-    console.log("🚀 ~ StaffManagement ~ data:", staffData, selectedPropertyId)
+
     const [createStaff, { isLoading: creating }] = useAddStaffMutation();
     const [updateStaff, { isLoading: updating }] = useUpdateStaffMutation();
     const [getStaffById] = useLazyGetStaffByIdQuery();
@@ -204,10 +211,19 @@ export default function StaffManagement() {
         }
     }
 
+    const excludedRoles = isSuperAdmin ? ["SUPER_ADMIN"]
+        : isOwner
+            ? ["SUPER_ADMIN", "OWNER"]
+            : ["SUPER_ADMIN", "OWNER", "ADMIN"];
 
     const toDateInput = (value?: string) =>
         value ? value.split("T")[0] : "";
 
+    const parseDate = (value?: string) =>
+        value ? new Date(value) : null;
+
+    const formatDate = (date: Date | null) =>
+        date ? date.toISOString().slice(0, 10) : "";
 
     return (
         <div className="min-h-screen bg-background">
@@ -226,7 +242,7 @@ export default function StaffManagement() {
                         <div>
                             <h1 className="text-2xl font-bold text-foreground">Staff</h1>
                             <p className="text-sm text-muted-foreground">
-                                Manage hotel staff and their details.
+                                Manage property staff and their details.
                             </p>
                         </div>
 
@@ -390,7 +406,7 @@ export default function StaffManagement() {
                                     <Button
                                         size="sm"
                                         variant="heroOutline"
-                                        disabled={staffData?.pagination?.page >= staffData?.pagination?.totalPages}
+                                        disabled={!staffData || staffData?.pagination?.page >= staffData?.pagination?.totalPages}
                                         onClick={() => setPage((p) => p + 1)}
                                     >
                                         Next
@@ -498,8 +514,9 @@ export default function StaffManagement() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Password*</Label>
+                                <Label>{mode === "add" ? "Password*" : "Password"}</Label>
                                 <Input
+                                    type="password"
                                     value={staff.password}
                                     onChange={(e) =>
                                         setStaff({ ...staff, password: normalizeTextInput(e.target.value) })
@@ -510,7 +527,7 @@ export default function StaffManagement() {
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="space-y-2">
-                                <Label>Emergency Contact</Label>
+                                <Label>Emergency Contact*</Label>
                                 <Input
                                     value={staff.emergency_contact}
                                     onChange={(e) =>
@@ -518,9 +535,57 @@ export default function StaffManagement() {
                                     }
                                 />
                             </div>
+                            <div className="space-y-2">
+                                <Label>Contact Name*</Label>
+                                <Input
+                                    value={staff.emergency_contact_name}
+                                    onChange={(e) =>
+                                        setStaff({ ...staff, emergency_contact_name: normalizeTextInput(e.target.value).slice(0, 10) })
+                                    }
+                                />
+                            </div>
 
                             <div className="space-y-2">
-                                <Label>Alternate Phone*</Label>
+                                <Label>Contact Relation*</Label>
+                                <Input
+                                    value={staff.emergency_contact_relation}
+                                    onChange={(e) =>
+                                        setStaff({ ...staff, emergency_contact_relation: normalizeTextInput(e.target.value).slice(0, 10) })
+                                    }
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Emergency Contact</Label>
+                                <Input
+                                    value={staff.emergency_contact_2}
+                                    onChange={(e) =>
+                                        setStaff({ ...staff, emergency_contact_2: normalizeTextInput(e.target.value).slice(0, 10) })
+                                    }
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Contact Name</Label>
+                                <Input
+                                    value={staff.emergency_contact_name_2}
+                                    onChange={(e) =>
+                                        setStaff({ ...staff, emergency_contact_name_2: normalizeTextInput(e.target.value).slice(0, 10) })
+                                    }
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Contact Relation</Label>
+                                <Input
+                                    value={staff.emergency_contact_relation_2}
+                                    onChange={(e) =>
+                                        setStaff({ ...staff, emergency_contact_relation_2: normalizeTextInput(e.target.value).slice(0, 10) })
+                                    }
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Alternate Phone</Label>
                                 <Input
                                     value={staff.phone2}
                                     onChange={(e) =>
@@ -554,7 +619,7 @@ export default function StaffManagement() {
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="space-y-2">
-                                <Label>Gender</Label>
+                                <Label>Gender*</Label>
                                 <select
                                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
                                     value={staff.gender}
@@ -568,7 +633,7 @@ export default function StaffManagement() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Marital Status</Label>
+                                <Label>Marital Status*</Label>
                                 <select
                                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
                                     value={staff.marital_status}
@@ -583,7 +648,7 @@ export default function StaffManagement() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Blood Group</Label>
+                                <Label>Blood Group*</Label>
                                 <Input
                                     value={staff.blood_group}
                                     onChange={(e) =>
@@ -594,61 +659,61 @@ export default function StaffManagement() {
                         </div>
 
                         {/* ID Proof */}
-                        <div className="space-y-2">
-                            <Label>ID Proof</Label>
+                        {/* <div className="space-y-2">
+                            <Label>ID Proof</Label> */}
 
-                            <div className="rounded-xl border border-border p-3 space-y-3">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>ID Proof Type</Label>
-                                        <select
-                                            className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                                            value={staff.id_proof_type}
-                                            onChange={(e) =>
-                                                setStaff({ ...staff, id_proof_type: normalizeTextInput(e.target.value) })
-                                            }
-                                        >
-                                            <option value="">Select type</option>
-                                            <option value="Aadhaar">Aadhaar</option>
-                                            <option value="PAN">PAN</option>
-                                            <option value="Passport">Passport</option>
-                                        </select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label>ID Number</Label>
-                                        <Input
-                                            value={staff.id_number}
-                                            onChange={(e) =>
-                                                setStaff({ ...staff, id_number: normalizeTextInput(e.target.value) })
-                                            }
-                                        />
-                                    </div>
-                                </div>
-
-                                {staff.id_proof_url ? (
-                                    <a
-                                        href={staff.id_proof_url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-sm text-primary hover:underline"
-                                    >
-                                        View uploaded ID proof
-                                    </a>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">
-                                        No ID proof uploaded
-                                    </p>
-                                )}
-
-                                <Input
-                                    type="file"
+                        {/* <div className="rounded-xl border border-border p-3 space-y-3"> */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>ID Proof Type*</Label>
+                                <select
+                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    value={staff.id_proof_type}
                                     onChange={(e) =>
-                                        setStaff({ ...staff, id_proof: e.target.files?.[0] })
+                                        setStaff({ ...staff, id_proof_type: normalizeTextInput(e.target.value) })
+                                    }
+                                >
+                                    <option value="">Select type</option>
+                                    <option value="Aadhaar">Aadhaar</option>
+                                    <option value="PAN">PAN</option>
+                                    <option value="Passport">Passport</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>ID Number*</Label>
+                                <Input
+                                    value={staff.id_number}
+                                    onChange={(e) =>
+                                        setStaff({ ...staff, id_number: normalizeTextInput(e.target.value) })
                                     }
                                 />
                             </div>
                         </div>
+
+                        {staff.id_proof_url ? (
+                            <a
+                                href={staff.id_proof_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-sm text-primary hover:underline"
+                            >
+                                View uploaded ID proof
+                            </a>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                No ID proof uploaded
+                            </p>
+                        )}
+
+                        <Input
+                            type="file"
+                            onChange={(e) =>
+                                setStaff({ ...staff, id_proof: e.target.files?.[0] })
+                            }
+                        />
+                        {/* </div> */}
+                        {/* </div> */}
 
                         <div className="space-y-2">
                             <Label>Address</Label>
@@ -679,29 +744,55 @@ export default function StaffManagement() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Hire Date</Label>
-                                <Input
+                                <Label>Joining Date*</Label>
+                                {/* <Input
                                     type="date"
                                     value={staff.hire_date}
                                     onChange={(e) =>
                                         setStaff({ ...staff, hire_date: normalizeTextInput(e.target.value) })
                                     }
+                                /> */}
+
+                                <DatePicker
+                                    selected={parseDate(staff.hire_date)}
+                                    placeholderText="dd-mm-yyyy"
+                                    onChange={(date) => {
+                                        setStaff({ ...staff, hire_date: formatDate(date) })
+                                    }}
+                                    // onChangeRaw={(e) => e.preventDefault()}
+                                    dateFormat="dd-MM-yyyy"
+                                    customInput={
+                                        <Input readOnly />
+                                    }
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Date of Birth</Label>
-                                <Input
+                                <Label>Date of Birth*</Label>
+                                {/* <Input
                                     type="date"
                                     value={staff.dob}
                                     onChange={(e) =>
                                         setStaff({ ...staff, dob: normalizeTextInput(e.target.value) })
                                     }
+                                /> */}
+
+                                <DatePicker
+                                    selected={parseDate(staff.dob)}
+                                    placeholderText="dd-mm-yyyy"
+                                    onChange={(date) => {
+                                        setStaff({ ...staff, dob: formatDate(date) })
+                                    }}
+                                    // onChangeRaw={(e) => e.preventDefault()}
+                                    dateFormat="dd-MM-yyyy"
+                                    customInput={
+                                        <Input readOnly />
+                                    }
                                 />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {/* <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Leave Days</Label>
                                 <Input
@@ -724,7 +815,7 @@ export default function StaffManagement() {
                                 />
                             </div>
 
-                            {/* <div className="space-y-2">
+                            <div className="space-y-2">
                                 <Label>User Mapping</Label>
                                 <Input
                                     value={staff.user_id}
@@ -733,8 +824,8 @@ export default function StaffManagement() {
                                         setStaff({ ...staff, user_id: normalizeTextInput(e.target.value)})
                                     }
                                 />
-                            </div> */}
-                        </div>
+                            </div>
+                        </div> */}
 
                         {/* Designation */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -767,13 +858,17 @@ export default function StaffManagement() {
                                     }
                                 >
                                     <option value="" disabled>Select</option>
-                                    {roles?.roles?.map((role) =>
-                                        role.name !== "SUPER_ADMIN" ? (
+                                    {roles?.roles
+                                        ?.filter(
+                                            (role) =>
+                                                !excludedRoles.includes(role.name.toUpperCase())
+                                        )
+                                        .map((role) => (
                                             <option value={role.id} key={role.id}>
                                                 {role.name}
                                             </option>
-                                        ) : null
-                                    )}
+                                        ))}
+
                                 </select>
 
                             </div>

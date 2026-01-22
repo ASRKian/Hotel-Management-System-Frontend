@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "react-toastify";
 import { Button } from "@/components/ui/button";
-import { useGetRoomsQuery, useAddRoomMutation } from "@/redux/services/hmsApi";
+import { useGetRoomsQuery, useAddRoomMutation, useGetRoomTypesQuery, useBulkUpdateRoomsMutation, useGetMyPropertiesQuery } from "@/redux/services/hmsApi";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAppSelector } from "@/redux/hook";
 import {
@@ -16,15 +16,22 @@ import {
 } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader";
+import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
+import { Label } from "@/components/ui/label";
 
 /* -------------------- Types -------------------- */
 type Room = {
     id: string;
-    room_type: string;
     room_no: string;
     floor_number: number;
-    is_active: boolean;
+    room_type_id: number | null;
+    is_active: boolean
+
+    room_category_name?: string;
+    bed_type_name?: string;
+    ac_type_name?: string;
 };
+
 
 /* -------------------- Props -------------------- */
 type Props = {
@@ -37,80 +44,179 @@ export default function RoomsByFloor() {
     const [open, setOpen] = useState(false);
     const [selectedFloor, setSelectedFloor] = useState<number | null>(null);
     const [roomType, setRoomType] = useState("STANDARD");
+    const [addedFloors, setAddedFloors] = useState<number[]>([]);
+    const [modalCategory, setModalCategory] = useState("");
+    const [modalBed, setModalBed] = useState("");
+    const [modalAc, setModalAc] = useState("");
+    const [roomDrafts, setRoomDrafts] = useState<
+        Record<string, { category?: string; bed?: string; ac?: string }>
+    >({});
+    const [propertyId, setPropertyId] = useState<string>("");
 
     const [addRoom, { isLoading: adding }] = useAddRoomMutation();
 
-
     const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
+    const isSuperAdmin = useAppSelector(selectIsSuperAdmin)
+    const isOwner = useAppSelector(selectIsOwner)
 
     const location = useLocation()
-    const navigate = useNavigate()
 
-    const propertyId = location.state?.propertyId
+    const id = location.state?.propertyId
 
-    const { data: rooms, isLoading: roomsLoading } = useGetRoomsQuery(propertyId, {
+    const { data: rooms } = useGetRoomsQuery(propertyId, {
         skip: !isLoggedIn || !propertyId
     })
 
+    const { data: roomTypes = [] } = useGetRoomTypesQuery({ propertyId }, {
+        skip: !isLoggedIn || !propertyId
+    });
+
+    const [updateRoomsBulk] = useBulkUpdateRoomsMutation()
+    const { data: properties, isLoading: propertiesLoading } = useGetMyPropertiesQuery(undefined, {
+        skip: !isLoggedIn
+    })
+
     useEffect(() => {
-        if (propertyId) return
-        navigate("/properties")
-    }, [propertyId])
+        if (id) {
+            setPropertyId(id);
+            return;
+        }
+
+        if (
+            !propertyId &&
+            !propertiesLoading &&
+            properties?.properties?.length > 0
+        ) {
+            setPropertyId(properties.properties[0].id);
+        }
+    }, [id, properties, propertiesLoading, propertyId]);
+
 
     useEffect(() => {
         setEditedRooms(rooms?.rooms);
     }, [rooms]);
 
-    const getChangedRooms = () => {
-        return editedRooms
-            ?.filter((edited) => {
-                const original = rooms?.rooms?.find((r) => r.id === edited.id);
-                if (!original) return false;
+    useEffect(() => {
+        if (open) {
+            setModalCategory("");
+            setModalBed("");
+            setModalAc("");
+        }
+    }, [open]);
 
-                return (
-                    original.room_no !== edited.room_no ||
-                    original.room_type !== edited.room_type ||
-                    original.is_active !== edited.is_active
-                );
+    const getChangedRooms = () => {
+        if (!Array.isArray(editedRooms) || !Array.isArray(rooms?.rooms)) return [];
+
+        const originalMap = new Map(
+            rooms.rooms.map(r => [r.id, r.room_type_id])
+        );
+
+        return editedRooms
+            .filter(edited => {
+                const originalTypeId = originalMap.get(edited.id);
+                return edited.room_type_id !== originalTypeId;
             })
-            ?.map(({ id, room_no, room_type, is_active }) => ({
-                id,
-                room_no,
-                room_type,
-                is_active,
-            }));
+            .map(r => ({
+                id: r.id,
+                room_type_id: r.room_type_id
+            }))
+            .filter(r => r.room_type_id !== null);
+    };
+
+    const resolveRoomTypeId = (
+        category: string,
+        bed: string,
+        ac: string
+    ) => {
+        const match = roomTypes.find(
+            rt =>
+                rt.room_category_name === category &&
+                rt.bed_type_name === bed &&
+                rt.ac_type_name === ac
+        );
+
+        return match?.id ?? null;
     };
 
     const handleBulkUpdate = async () => {
         const payload = getChangedRooms();
+        console.log("🚀 ~ handleBulkUpdate ~ payload:", payload)
 
         if (payload.length === 0) return;
 
-        // await updateRoomsBulk(payload); 
+        const promise = updateRoomsBulk(payload).unwrap()
 
-        toast.success("Rooms updated successfully");
+        toast.promise(promise, {
+            success: "Rooms updated successfully",
+            pending: "Updating rooms...",
+            error: "Error updating rooms"
+        });
     };
 
     const roomsByFloor = useMemo(() => {
-        if (roomsLoading) return []
+        if (!editedRooms) return [];
 
-        const map: Record<number, Room[]> = {};
+        const floorMap: Record<number, Room[]> = {};
 
-        Array.isArray(editedRooms) && editedRooms.forEach((room) => {
-            if (!map[room.floor_number]) {
-                map[room.floor_number] = [];
+        // existing rooms
+        editedRooms.forEach(room => {
+            if (!floorMap[room.floor_number]) {
+                floorMap[room.floor_number] = [];
             }
-            map[room.floor_number].push(room);
+            floorMap[room.floor_number].push(room);
         });
 
-        return Object.entries(map)
+        // empty floors added from UI
+        addedFloors.forEach(floor => {
+            if (!floorMap[floor]) {
+                floorMap[floor] = [];
+            }
+        });
+
+        return Object.entries(floorMap)
             .map(([floor, rooms]) => ({
                 floor: Number(floor),
-                // rooms: rooms.sort((a, b) => a.room_no.localeCompare(b.room_no)),
                 rooms
             }))
             .sort((a, b) => a.floor - b.floor);
-    }, [editedRooms, rooms]);
+    }, [editedRooms, addedFloors]);
+
+    const {
+        roomCategories,
+        bedTypes,
+        acTypes,
+    } = useMemo(() => {
+        const rc = new Set<string>();
+        const bt = new Set<string>();
+        const ac = new Set<string>();
+
+        roomTypes.forEach(rt => {
+            rc.add(rt.room_category_name);
+            bt.add(rt.bed_type_name);
+            ac.add(rt.ac_type_name);
+        });
+
+        return {
+            roomCategories: Array.from(rc),
+            bedTypes: Array.from(bt),
+            acTypes: Array.from(ac),
+        };
+    }, [roomTypes]);
+
+    const getRoomSelectValue = (
+        room: Room,
+        key: "category" | "bed" | "ac"
+    ) => {
+        if (room.room_type_id) {
+            const rt = roomTypes.find(rt => rt.id === room.room_type_id);
+            if (!rt) return "";
+            if (key === "category") return rt.room_category_name;
+            if (key === "bed") return rt.bed_type_name;
+            return rt.ac_type_name;
+        }
+
+        return roomDrafts[room.id]?.[key] ?? "";
+    };
 
     return (
         <div className="min-h-screen bg-background">
@@ -125,12 +231,55 @@ export default function RoomsByFloor() {
                 <div className="flex-1 overflow-y-auto scrollbar-hide p-6 lg:p-8">
 
                     {/* Header */}
-                    <div className="mb-6">
-                        <h1 className="text-2xl font-bold text-foreground">Rooms</h1>
-                        <p className="text-sm text-muted-foreground">
-                            View rooms grouped by floor
-                        </p>
+                    {/* Header */}
+                    <div className="mb-6 flex items-center justify-between">
+                        <div>
+                            <h1 className="text-2xl font-bold text-foreground">Rooms</h1>
+                            <p className="text-sm text-muted-foreground">
+                                View rooms grouped by floor
+                            </p>
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                const existingFloors = roomsByFloor.map(f => f.floor);
+                                const nextFloor =
+                                    existingFloors.length > 0
+                                        ? Math.max(...existingFloors) + 1
+                                        : 0;
+
+                                if (!addedFloors.includes(nextFloor)) {
+                                    setAddedFloors(prev => [...prev, nextFloor]);
+                                }
+
+                                toast.success(`Floor ${nextFloor} added`);
+                            }}
+                        >
+                            + Add Floor
+                        </Button>
+
                     </div>
+
+                    {/* Property Filter */}
+                    {(isSuperAdmin || isOwner) && Array.isArray(properties?.properties) && properties?.properties.length > 1 && <div className="mb-4 max-w-sm space-y-2">
+                        <Label>Property</Label>
+                        <select
+                            className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                            value={propertyId}
+                            onChange={(e) => setPropertyId(e.target.value)}
+                        >
+                            <option value="" disabled>Select Properties</option>
+
+                            {!propertiesLoading &&
+                                properties?.properties?.map((property) => (
+                                    <option key={property.id} value={property.id}>
+                                        {property.brand_name}
+                                    </option>
+                                ))}
+                        </select>
+
+                    </div>}
 
                     {/* Floors */}
                     <div className="space-y-10">
@@ -175,24 +324,121 @@ export default function RoomsByFloor() {
                                             {/* Room Type */}
                                             <select
                                                 className="bg-transparent text-sm font-semibold text-center outline-none border-b border-border appearance-none cursor-pointer"
-                                                value={room.room_type}
-                                                onChange={(e) =>
-                                                    setEditedRooms((prev) =>
-                                                        prev.map((r) =>
-                                                            r.id === room.id
-                                                                ? { ...r, room_type: e.target.value }
-                                                                : r
-                                                        )
-                                                    )
-                                                }
+                                                value={getRoomSelectValue(room, "category")}
+                                                onChange={(e) => {
+                                                    const category = e.target.value;
+
+                                                    const bed = getRoomSelectValue(room, "bed");
+                                                    const ac = getRoomSelectValue(room, "ac");
+
+                                                    const nextRoomTypeId = resolveRoomTypeId(category, bed, ac);
+
+                                                    if (nextRoomTypeId) {
+                                                        setEditedRooms(prev =>
+                                                            prev.map(r =>
+                                                                r.id === room.id
+                                                                    ? { ...r, room_type_id: nextRoomTypeId }
+                                                                    : r
+                                                            )
+                                                        );
+                                                        setRoomDrafts(prev => {
+                                                            const { [room.id]: _, ...rest } = prev;
+                                                            return rest;
+                                                        });
+                                                    } else {
+                                                        setRoomDrafts(prev => ({
+                                                            ...prev,
+                                                            [room.id]: { ...prev[room.id], category }
+                                                        }));
+                                                    }
+                                                }}
                                             >
-                                                <option value="STANDARD">STANDARD</option>
-                                                <option value="DELUXE">DELUXE</option>
+
+
+                                                <option value="" disabled>Category Type</option>
+                                                {roomCategories.map(c => (
+                                                    <option key={c} value={c}>{c}</option>
+                                                ))}
+                                            </select>
+                                            <select
+                                                className="bg-transparent text-sm font-semibold text-center outline-none border-b border-border appearance-none cursor-pointer"
+                                                value={getRoomSelectValue(room, "bed")}
+                                                onChange={(e) => {
+                                                    const bed = e.target.value;
+
+                                                    const category = getRoomSelectValue(room, "category");
+                                                    const ac = getRoomSelectValue(room, "ac");
+
+                                                    const nextRoomTypeId = resolveRoomTypeId(category, bed, ac);
+
+                                                    if (nextRoomTypeId) {
+                                                        setEditedRooms(prev =>
+                                                            prev.map(r =>
+                                                                r.id === room.id
+                                                                    ? { ...r, room_type_id: nextRoomTypeId }
+                                                                    : r
+                                                            )
+                                                        );
+                                                        setRoomDrafts(prev => {
+                                                            const { [room.id]: _, ...rest } = prev;
+                                                            return rest;
+                                                        });
+                                                    } else {
+                                                        setRoomDrafts(prev => ({
+                                                            ...prev,
+                                                            [room.id]: { ...prev[room.id], bed }
+                                                        }));
+                                                    }
+                                                }}
+                                            >
+
+
+                                                <option value="" disabled>Bed Type</option>
+                                                {bedTypes.map(b => (
+                                                    <option key={b} value={b}>{b}</option>
+                                                ))}
+                                            </select>
+                                            <select
+                                                className="bg-transparent text-sm font-semibold text-center outline-none border-b border-border appearance-none cursor-pointer"
+                                                value={getRoomSelectValue(room, "ac")}
+                                                onChange={(e) => {
+                                                    const ac = e.target.value;
+
+                                                    const category = getRoomSelectValue(room, "category");
+                                                    const bed = getRoomSelectValue(room, "bed");
+
+                                                    const nextRoomTypeId = resolveRoomTypeId(category, bed, ac);
+
+                                                    if (nextRoomTypeId) {
+                                                        setEditedRooms(prev =>
+                                                            prev.map(r =>
+                                                                r.id === room.id
+                                                                    ? { ...r, room_type_id: nextRoomTypeId }
+                                                                    : r
+                                                            )
+                                                        );
+                                                        setRoomDrafts(prev => {
+                                                            const { [room.id]: _, ...rest } = prev;
+                                                            return rest;
+                                                        });
+                                                    } else {
+                                                        setRoomDrafts(prev => ({
+                                                            ...prev,
+                                                            [room.id]: { ...prev[room.id], ac }
+                                                        }));
+                                                    }
+                                                }}
+                                            >
+
+
+                                                <option value="" disabled>AC Type</option>
+                                                {acTypes.map(a => (
+                                                    <option key={a} value={a}>{a}</option>
+                                                ))}
                                             </select>
 
-
                                             {/* Active Toggle */}
-                                            <div className="flex items-center justify-center mt-2">
+                                            {/* <div className="flex items-center justify-center mt-2">
                                                 <Switch
                                                     checked={room.is_active}
                                                     onCheckedChange={(checked) =>
@@ -203,7 +449,7 @@ export default function RoomsByFloor() {
                                                         )
                                                     }
                                                 />
-                                            </div>
+                                            </div> */}
                                         </div>
 
                                     ))}
@@ -265,17 +511,53 @@ export default function RoomsByFloor() {
                             ?
                         </p>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Room Type</label>
-                            <select
-                                className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                                value={roomType}
-                                onChange={(e) => setRoomType(e.target.value)}
-                            >
-                                <option value="STANDARD">STANDARD</option>
-                                <option value="DELUXE">DELUXE</option>
-                            </select>
+                        <div className="space-y-3">
+                            {/* Room Category */}
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium">Room Category</label>
+                                <select
+                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    value={modalCategory}
+                                    onChange={(e) => setModalCategory(e.target.value)}
+                                >
+                                    <option value="">Select category</option>
+                                    {roomCategories.map(c => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Bed Type */}
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium">Bed Type</label>
+                                <select
+                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    value={modalBed}
+                                    onChange={(e) => setModalBed(e.target.value)}
+                                >
+                                    <option value="">Select bed</option>
+                                    {bedTypes.map(b => (
+                                        <option key={b} value={b}>{b}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* AC Type */}
+                            <div className="space-y-1">
+                                <label className="text-sm font-medium">AC Type</label>
+                                <select
+                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    value={modalAc}
+                                    onChange={(e) => setModalAc(e.target.value)}
+                                >
+                                    <option value="">Select AC</option>
+                                    {acTypes.map(a => (
+                                        <option key={a} value={a}>{a}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
+
                     </div>
 
                     <DialogFooter>
@@ -289,18 +571,38 @@ export default function RoomsByFloor() {
 
                         <Button
                             variant="hero"
-                            disabled={adding}
+                            disabled={
+                                adding ||
+                                !modalCategory ||
+                                !modalBed ||
+                                !modalAc
+                            }
                             onClick={async () => {
                                 if (selectedFloor === null) return;
 
+                                const roomTypeId = resolveRoomTypeId(
+                                    modalCategory,
+                                    modalBed,
+                                    modalAc
+                                );
+
+                                if (!roomTypeId) {
+                                    toast.error("Invalid room type combination");
+                                    return;
+                                }
+
                                 try {
-                                    await addRoom({
+                                    const promise = addRoom({
                                         propertyId,
                                         floorNumber: selectedFloor,
-                                        roomType,
+                                        roomTypeId
                                     }).unwrap();
 
-                                    toast.success("Room added successfully");
+                                    toast.promise(promise, {
+                                        pending: "Creating room...",
+                                        success: "Room created successfully",
+                                        error: "Error creating room"
+                                    })
                                     setOpen(false);
                                 } catch {
                                     toast.error("Failed to add room");
@@ -309,6 +611,7 @@ export default function RoomsByFloor() {
                         >
                             {adding ? "Adding..." : "Add Room"}
                         </Button>
+
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

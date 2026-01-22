@@ -7,7 +7,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAppSelector } from "@/redux/hook";
+import { useGetMeQuery } from "@/redux/services/hmsApi";
 import { LogOut, Settings, User } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 type Props = {
     user?: {
@@ -18,10 +21,20 @@ type Props = {
 };
 
 export default function AppHeader({ user }: Props) {
-    const initials = (() => {
-        if (!user?.name) return "U";
 
-        const parts = user.name.trim().split(/\s+/);
+    const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
+
+    const { data } = useGetMeQuery(undefined, {
+        skip: !isLoggedIn
+    })
+
+    const navigate = useNavigate()
+
+    const initials = (() => {
+        // if (!user?.name) return "U";
+        if (!data?.user?.staff?.first_name) return "U"
+
+        const parts = data?.user?.staff?.first_name.trim().split(/\s+/);
 
         if (parts.length === 1) {
             return parts[0][0].toUpperCase();
@@ -29,6 +42,11 @@ export default function AppHeader({ user }: Props) {
 
         return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     })();
+
+    function logout() {
+        localStorage.clear()
+        navigate("/login")
+    }
 
     return (
         <header className="sticky top-0 z-50 h-14 border-b border-border bg-background flex items-center justify-between px-4 lg:px-6">
@@ -45,14 +63,23 @@ export default function AppHeader({ user }: Props) {
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                        {/* Name & Email */}
+                        <div className="hidden sm:flex flex-col items-end leading-tight text-right">
+                            <span className="text-sm font-medium text-foreground max-w-[140px] truncate">
+                                {data?.user?.staff?.first_name ?? "User"}
+                            </span>
+                            <span className="text-xs text-muted-foreground max-w-[140px] truncate">
+                                {data?.user?.email ?? ""}
+                            </span>
+                        </div>
                         <Avatar className="h-8 w-8">
-                            {user?.avatar_url ? (
+                            {/* {user?.avatar_url ? (
                                 <AvatarImage src={user.avatar_url} />
-                            ) : (
-                                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                                    {initials}
-                                </AvatarFallback>
-                            )}
+                            ) : ( */}
+                            <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                                {initials}
+                            </AvatarFallback>
+                            {/* )} */}
                         </Avatar>
                     </button>
                 </DropdownMenuTrigger>
@@ -70,7 +97,7 @@ export default function AppHeader({ user }: Props) {
 
                     <DropdownMenuSeparator />
 
-                    <DropdownMenuItem className="text-destructive">
+                    <DropdownMenuItem className="text-destructive" onClick={logout}>
                         <LogOut className="mr-2 h-4 w-4" />
                         Logout
                     </DropdownMenuItem>

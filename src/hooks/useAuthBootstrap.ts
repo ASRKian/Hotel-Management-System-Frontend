@@ -1,13 +1,13 @@
 import { useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import { useLazyGetMeQuery } from "@/redux/services/hmsApi";
-import { logout, setMeLoaded } from "@/redux/slices/isLoggedInSlice";
+import { logout, setApiLoaded, setMeLoaded } from "@/redux/slices/isLoggedInSlice";
+import { useAppDispatch, useAppSelector } from "@/redux/hook";
 
 export function useAuthBootstrap() {
-    const dispatch = useDispatch();
+    const dispatch = useAppDispatch();
 
-    const isLoggedIn = useSelector((state: any) => state.isLoggedIn.value);
-    const meLoaded = useSelector((state: any) => state.isLoggedIn.meLoaded);
+    const isLoggedIn = useAppSelector(state => state.isLoggedIn.value);
+    const meLoaded = useAppSelector(state => state.isLoggedIn.meLoaded);
 
     const [getMe] = useLazyGetMeQuery();
 
@@ -20,6 +20,8 @@ export function useAuthBootstrap() {
                 dispatch(setMeLoaded());
             } catch (err) {
                 dispatch(logout());
+            } finally {
+                dispatch(setApiLoaded(true));
             }
         })();
     }, [isLoggedIn, meLoaded]);

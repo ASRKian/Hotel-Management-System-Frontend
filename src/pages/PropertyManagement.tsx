@@ -20,14 +20,15 @@ import {
 } from "@/components/ui/table";
 import { Building2, Phone, Mail, Image as ImageIcon } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
-import { useAddPropertyBySuperAdminMutation, useAddPropertyMutation, useBulkUpsertPropertyFloorsMutation, useGetMeQuery, useGetPropertiesQuery, useGetPropertyFloorsQuery, useLazyGetUsersByRoleQuery, useUpdatePropertiesMutation } from "@/redux/services/hmsApi";
+import { useAddPropertyBySuperAdminMutation, useAddPropertyMutation, useBulkUpsertPropertyFloorsMutation, useGetMeQuery, useGetPropertiesQuery, useGetPropertyBanksQuery, useGetPropertyFloorsQuery, useLazyGetUsersByPropertyAndRoleQuery, useLazyGetUsersByRoleQuery, useUpdatePropertiesMutation, useUpsertPropertyBanksMutation } from "@/redux/services/hmsApi";
 import { useDebounce } from "@/hooks/use-debounce";
 import { toast } from "react-toastify";
 import { useAppSelector } from "@/redux/hook";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
-import { normalizeTextInput } from "@/utils/normalizeTextInput";
+import { normalizeNumberInput, normalizeTextInput } from "@/utils/normalizeTextInput";
 import { useNavigate } from "react-router-dom";
 import AppHeader from "@/components/layout/AppHeader";
+import { isWithinCharLimit } from "@/utils/isWithinCharLimit";
 
 // ---- Types ----
 type Property = {
@@ -78,11 +79,58 @@ const EMPTY_PROPERTY = {
     id: null,
     floors: [] as {
         floor_number: number;
-        total_rooms: number;
+        total_rooms: number | "";
     }[],
-    owner_user_id: ""
+    owner_user_id: "",
+    gst_no: "",
+    location_link: "",
+    address_line_1_office: "",
+    address_line_2_office: "",
+    city_office: "",
+    state_office: "",
+    postal_code_office: "",
+    country_office: "",
+    phone_office: "",
+    phone2_office: "",
+    email_office: "",
+    status: "OWNED",
+    bank_accounts: [] as BankAccount[],
+    has_bank_details: false,
 };
 
+type BankAccount = {
+    id?: number; // IMPORTANT for update
+    account_holder_name: string;
+    account_number: string;
+    ifsc_code: string;
+    bank_name: string;
+};
+
+function FormSection({
+    title,
+    description,
+    children,
+}: {
+    title: string;
+    description?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
+            <div>
+                <h3 className="text-base font-semibold text-foreground">
+                    {title}
+                </h3>
+                {description && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                        {description}
+                    </p>
+                )}
+            </div>
+            {children}
+        </div>
+    );
+}
 
 export default function PropertyManagement() {
     const [mode, setMode] = useState<"add" | "edit">("add");
@@ -101,6 +149,26 @@ export default function PropertyManagement() {
     const [updatingPropertyIds, setUpdatingPropertyIds] = useState<Set<string>>(new Set());
     const [newProperty, setNewProperty] = useState(EMPTY_PROPERTY);
     const [originalProperty, setOriginalProperty] = useState<any>(null);
+    const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [imageError, setImageError] = useState(false);
+    const [logoError, setLogoError] = useState(false);
+
+    const [showOfficeFields, setShowOfficeFields] = useState(false);
+    const [hasBankDetails, setHasBankDetails] = useState(false);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
+        {
+            account_holder_name: "",
+            account_number: "",
+            ifsc_code: "",
+            bank_name: "",
+        },
+    ]);
+    const [deletedBankIds, setDeletedBankIds] = useState<number[]>([]);
+    const [originalBankAccounts, setOriginalBankAccounts] = useState<BankAccount[]>([]);
+    const [originalHasBankDetails, setOriginalHasBankDetails] = useState(false);
 
     const debouncedSearch = useDebounce(search, 500)
     // const isLoggedIn = useSelector((state: any) => state.isLoggedIn.value);
@@ -131,9 +199,15 @@ export default function PropertyManagement() {
     const { data: floorsResponse, isLoading: floorsLoading } = useGetPropertyFloorsQuery(selectedProperty?.id, { skip: !selectedProperty?.id, });
     const floors = floorsResponse?.floors ?? [];
 
+    const { data: propertyBanks } = useGetPropertyBanksQuery(selectedProperty?.id, {
+        skip: !isLoggedIn || !selectedProperty?.id
+    })
+
     const [bulkUpsertFloors] = useBulkUpsertPropertyFloorsMutation()
+    const [upsertPropertyBank] = useUpsertPropertyBanksMutation()
 
     const [getUsers, { data: users }] = useLazyGetUsersByRoleQuery()
+    const [getPropertyAdmins, { data: propertyAdmins }] = useLazyGetUsersByPropertyAndRoleQuery()
     const isSuperAdmin = useAppSelector(selectIsSuperAdmin)
     const isOwner = useAppSelector(selectIsOwner)
 
@@ -141,10 +215,11 @@ export default function PropertyManagement() {
         if (!isLoggedIn) return
         if (isSuperAdmin) {
             getUsers("owner")
-        } else if (isOwner) {
-            getUsers("admin")
+        } else if (isOwner && selectedProperty) {
+            // getUsers("admin")
+            getPropertyAdmins({ propertyId: selectedProperty.id, role: "admin" })
         }
-    }, [isLoggedIn, isSuperAdmin, getUsers])
+    }, [isLoggedIn, isSuperAdmin, getUsers, selectedProperty])
 
     useEffect(() => {
         if (mode === "edit" && floors.length > 0) {
@@ -169,6 +244,57 @@ export default function PropertyManagement() {
         }
     }, [newProperty.total_floors, mode]);
 
+    useEffect(() => {
+        return () => {
+            if (imagePreview) {
+                URL.revokeObjectURL(imagePreview);
+            }
+        };
+    }, [imagePreview]);
+
+    useEffect(() => {
+        console.log("🚀 ~ PropertyManagement ~ newProperty.address_line_1_office:", newProperty.address_line_1_office === null)
+        if (mode === "edit" && newProperty.address_line_1_office) {
+            setShowOfficeFields(true);
+        }
+    }, [mode, newProperty.address_line_1_office]);
+
+    useEffect(() => {
+        if (sheetOpen) return
+        setShowOfficeFields(false)
+    }, [sheetOpen])
+
+    useEffect(() => {
+        return () => {
+            if (imagePreview) URL.revokeObjectURL(imagePreview);
+            if (logoPreview) URL.revokeObjectURL(logoPreview);
+        };
+    }, [imagePreview, logoPreview]);
+
+    useEffect(() => {
+        setImageError(false);
+        setLogoError(false);
+    }, [newProperty?.id]);
+
+    useEffect(() => {
+        if (mode !== "edit") return;
+
+        if (propertyBanks?.length) {
+            setHasBankDetails(true);
+            setBankAccounts(propertyBanks);
+        } else {
+            setHasBankDetails(false);
+            setBankAccounts([
+                {
+                    account_holder_name: "",
+                    account_number: "",
+                    ifsc_code: "",
+                    bank_name: "",
+                },
+            ]);
+        }
+    }, [propertyBanks, mode]);
+
     const toggleActive = async (id: string, is_active: boolean) => {
         setUpdatingPropertyIds(prev => new Set(prev).add(id));
 
@@ -188,6 +314,7 @@ export default function PropertyManagement() {
         }
     };
 
+    const isValid = (value) => /^[^,\s]+(,[^,\s]+)*$/.test(value);
 
     function buildPropertyFormData(payload: any) {
         const fd = new FormData()
@@ -226,11 +353,31 @@ export default function PropertyManagement() {
         if (payload.smoking_policy) fd.append('smoking_policy', payload.smoking_policy)
         if (payload.cancellation_policy) fd.append('cancellation_policy', payload.cancellation_policy)
 
-        if (payload.image instanceof File) {
-            fd.append('image', payload.image)
-            fd.append('image_mime', payload.image.type)
+        if (selectedImageFile) {
+            fd.append("image", selectedImageFile);
+            fd.append("image_mime", selectedImageFile.type);
         }
+
         if (payload.owner_user_id) fd.append("owner_user_id", payload.owner_user_id)
+        if (payload.gst_no) fd.append("gst_no", payload.gst_no)
+
+        if (payload.location_link) fd.append("location_link", payload.location_link);
+
+        if (payload.address_line_1_office) fd.append("address_line_1_office", payload.address_line_1_office);
+        if (payload.address_line_2_office) fd.append("address_line_2_office", payload.address_line_2_office);
+        if (payload.city_office) fd.append("city_office", payload.city_office);
+        if (payload.state_office) fd.append("state_office", payload.state_office);
+        if (payload.postal_code_office) fd.append("postal_code_office", payload.postal_code_office);
+        if (payload.country_office) fd.append("country_office", payload.country_office);
+
+        if (payload.phone_office) fd.append("phone_office", payload.phone_office);
+        if (payload.phone2_office) fd.append("phone2_office", payload.phone2_office);
+        if (payload.email_office) fd.append("email_office", payload.email_office);
+        if (logoFile) {
+            fd.append("logo", logoFile);
+            fd.append("logo_mime", logoFile.type);
+        }
+        if (payload.status) fd.append("status", payload.status)
 
         return fd
     }
@@ -241,7 +388,7 @@ export default function PropertyManagement() {
         const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 
         if (!newProperty.brand_name) {
-            toast.error('Hotel name is required', {
+            toast.error('Property name is required', {
                 position: "top-right",
                 autoClose: 5000,
                 hideProgressBar: false,
@@ -252,6 +399,32 @@ export default function PropertyManagement() {
                 theme: "light"
             });
             return
+        }
+        if (!newProperty.serial_number) {
+            toast.error('Serial number is required', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
+        if (hasBankDetails) {
+            for (const bank of bankAccounts) {
+                if (
+                    !bank.account_holder_name ||
+                    !bank.account_number ||
+                    !bank.ifsc_code ||
+                    !bank.bank_name
+                ) {
+                    toast.error("Please fill all bank account fields");
+                    return;
+                }
+            }
         }
         if (!newProperty.serial_number) {
             toast.error('Serial number is required', {
@@ -344,6 +517,33 @@ export default function PropertyManagement() {
             });
             return
         }
+        if (!newProperty.gst_no) {
+            toast.error('GST Number is required', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
+
+        if (hasBankDetails) {
+            for (const bank of bankAccounts) {
+                if (
+                    !bank.account_holder_name ||
+                    !bank.account_number ||
+                    !bank.ifsc_code ||
+                    !bank.bank_name
+                ) {
+                    toast.error("Please fill all bank account fields");
+                    return;
+                }
+            }
+        }
 
         if (!phoneRegex.test(newProperty.phone)) {
             toast.error('Incorrect Phone Number', {
@@ -371,6 +571,7 @@ export default function PropertyManagement() {
             });
             return
         }
+
         if (!emailRegex.test(newProperty.email)) {
             toast.error('Incorrect email', {
                 position: "top-right",
@@ -385,6 +586,145 @@ export default function PropertyManagement() {
             return
         }
 
+        if (showOfficeFields && !newProperty.address_line_1_office) {
+            toast.error('Please add office address', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
+
+        if (showOfficeFields && !newProperty.city_office) {
+            toast.error('Office city required', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
+
+        if (showOfficeFields && !newProperty.state_office) {
+            toast.error('Office State required', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
+
+        if (showOfficeFields && !newProperty.postal_code_office) {
+            toast.error('Office postal code required', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
+
+        if (showOfficeFields && !newProperty.country_office) {
+            toast.error('Office Country required', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
+
+        if (showOfficeFields && !newProperty.phone_office) {
+            toast.error('Office Phone Number required', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
+
+        if (newProperty.phone_office && !phoneRegex.test(newProperty.phone_office)) {
+            toast.error('Incorrect office Phone Number', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
+
+        if (newProperty.phone2_office && !phoneRegex.test(newProperty.phone2_office)) {
+            toast.error('Incorrect alternate office Phone Number', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
+
+        if (showOfficeFields && !newProperty.email_office) {
+            toast.error('Office email required', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
+
+        if (newProperty.email_office && !emailRegex.test(newProperty.email_office)) {
+            toast.error('Incorrect office email', {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light"
+            });
+            return
+        }
 
         const formData = buildPropertyFormData(newProperty)
 
@@ -407,6 +747,15 @@ export default function PropertyManagement() {
         })
 
         const { id } = await promise
+
+        if (hasBankDetails) {
+            await upsertPropertyBank({
+                propertyId: id,
+                accounts: bankAccounts,
+                deletedIds: deletedBankIds,
+            }).unwrap();
+        }
+
         await bulkUpsertFloors({
             property_id: id,
             floors: newProperty.floors.map((f) => ({
@@ -416,11 +765,12 @@ export default function PropertyManagement() {
             prefix: newProperty.serial_suffix
         }).unwrap();
         if (mode === "add") {
-            navigate("/property-rooms", {
+            navigate("/rooms", {
                 state: { propertyId: id }
             })
         }
         setSheetOpen(false)
+        setDeletedBankIds([]);
     }
 
     function syncFloors(totalFloors: number) {
@@ -433,7 +783,7 @@ export default function PropertyManagement() {
                 for (let i = floors.length + 1; i <= totalFloors; i++) {
                     floors.push({
                         floor_number: i,
-                        total_rooms: 0,
+                        total_rooms: 1,
                     });
                 }
             }
@@ -465,11 +815,76 @@ export default function PropertyManagement() {
         return clone;
     }
 
+    const addBankAccount = () => {
+        setBankAccounts(prev => [
+            ...prev,
+            {
+                account_holder_name: "",
+                account_number: "",
+                ifsc_code: "",
+                bank_name: "",
+            },
+        ]);
+    };
+
+    const updateBankField = (
+        index: number,
+        field: keyof BankAccount,
+        value: string
+    ) => {
+        setBankAccounts(prev => {
+            const copy = [...prev];
+            copy[index] = {
+                ...copy[index],
+                [field]: normalizeTextInput(value),
+            };
+            return copy;
+        });
+    };
+
+    const removeBankAccount = (index: number) => {
+        setBankAccounts(prev => {
+            const removed = prev[index];
+            if (removed?.id) {
+                setDeletedBankIds(ids => [...ids, removed.id!]);
+            }
+            return prev.filter((_, i) => i !== index);
+        });
+    };
+
+    function normalizeBanks(banks: BankAccount[]) {
+        return banks.map(b => ({
+            id: b.id ?? null,
+            account_holder_name: b.account_holder_name,
+            account_number: b.account_number,
+            ifsc_code: b.ifsc_code,
+            bank_name: b.bank_name,
+        }));
+    }
+
     const isDirty =
         mode === "edit" &&
         originalProperty &&
-        JSON.stringify(normalizeForCompare(originalProperty)) !==
-        JSON.stringify(normalizeForCompare(newProperty));
+        (
+            JSON.stringify(normalizeForCompare(originalProperty)) !==
+            JSON.stringify(normalizeForCompare(newProperty))
+            ||
+            JSON.stringify(normalizeBanks(originalBankAccounts)) !==
+            JSON.stringify(normalizeBanks(bankAccounts))
+            ||
+            originalHasBankDetails !== hasBankDetails
+            ||
+            deletedBankIds.length > 0
+            ||
+            !!selectedImageFile
+        );
+
+    useEffect(() => {
+        if (!sheetOpen) {
+            setDeletedBankIds([]);
+        }
+    }, [sheetOpen]);
+
 
     return (
         <div className="min-h-screen bg-background">
@@ -495,6 +910,9 @@ export default function PropertyManagement() {
                             variant="hero"
                             onClick={() => {
                                 setMode("add");
+                                // setLogoFile(null);
+                                // setLogoPreview(null);
+
                                 setSelectedProperty(null);
                                 setNewProperty(EMPTY_PROPERTY);
                                 setSheetOpen(true);
@@ -538,7 +956,7 @@ export default function PropertyManagement() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Property</TableHead>
-                                    <TableHead>Status</TableHead>
+                                    {/* <TableHead>Status</TableHead> */}
                                     <TableHead className="text-right">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -559,7 +977,7 @@ export default function PropertyManagement() {
                                             </TableCell>
                                         </TableRow>
                                     )}
-                                {!propertiesLoading && !propertyUninitialized && !propertiesError && properties.data.map((property) => (
+                                {!propertiesLoading && !propertyUninitialized && !propertiesError && properties && properties.data.map((property) => (
                                     <TableRow key={property.id}>
                                         <TableCell className="font-medium">
                                             <div className="flex items-center gap-2">
@@ -570,12 +988,12 @@ export default function PropertyManagement() {
                                                 {property.city}, {property.state}
                                             </p>
                                         </TableCell>
-                                        <PropertyStatusCell
+                                        {/* <PropertyStatusCell
                                             isUpdating={updatingPropertyIds.has(property.id)}
                                             key={property.id}
                                             property={property}
                                             toggleActive={toggleActive}
-                                        />
+                                        /> */}
                                         <TableCell className="text-right">
                                             <Button
                                                 size="sm"
@@ -594,7 +1012,11 @@ export default function PropertyManagement() {
                                                     };
 
                                                     setNewProperty(prepared);
-                                                    setOriginalProperty(JSON.parse(JSON.stringify(prepared))); // ✅ snapshot
+                                                    setOriginalProperty(JSON.parse(JSON.stringify(prepared)));
+                                                    setOriginalBankAccounts(
+                                                        propertyBanks ? JSON.parse(JSON.stringify(propertyBanks)) : []
+                                                    );
+                                                    setOriginalHasBankDetails(!!propertyBanks?.length);
                                                     setSheetOpen(true);
                                                 }}
                                             >
@@ -626,7 +1048,7 @@ export default function PropertyManagement() {
                                         size="sm"
                                         variant="heroOutline"
                                         disabled={
-                                            page === properties.pagination.totalPages || propertiesFetching
+                                            page >= properties.pagination.totalPages || propertiesFetching
                                         }
                                         onClick={() => setPage((p) => p + 1)}
                                     >
@@ -641,7 +1063,10 @@ export default function PropertyManagement() {
             </main>
 
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+                <SheetContent
+                    side="right"
+                    className="w-full sm:max-w-3xl lg:max-w-4xl overflow-y-auto"
+                >
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -658,11 +1083,16 @@ export default function PropertyManagement() {
                             <Label>Property Image</Label>
 
                             <div className="relative rounded-xl border border-border overflow-hidden">
-                                {newProperty.image ? (
+                                {(imagePreview || (newProperty.id && !imageError)) ? (
                                     <img
-                                        src={`${import.meta.env.VITE_API_URL}/properties/${newProperty.id}/image`}
-                                        alt="Property preview"
+                                        src={
+                                            imagePreview
+                                                ? imagePreview
+                                                : `${import.meta.env.VITE_API_URL}/properties/${newProperty.id}/image`
+                                        }
+                                        alt="Property image"
                                         className="w-full h-48 object-cover"
+                                        onError={() => setImageError(true)}
                                     />
                                 ) : (
                                     <div className="h-48 bg-muted flex flex-col items-center justify-center text-muted-foreground">
@@ -671,26 +1101,32 @@ export default function PropertyManagement() {
                                     </div>
                                 )}
 
-                                {/* Overlay upload input */}
                                 <input
                                     type="file"
                                     accept="image/*"
                                     className="absolute inset-0 opacity-0 cursor-pointer"
                                     onChange={(e) => {
                                         const file = e.target.files?.[0];
-                                        if (file) {
-                                            setNewProperty({ ...newProperty, image: file });
-                                        }
+                                        if (!file) return;
+
+                                        setSelectedImageFile(file);
+                                        setImagePreview(URL.createObjectURL(file));
+                                        setImageError(false); // reset error on new upload
                                     }}
                                 />
                             </div>
 
-                            {newProperty.image && (
+
+                            {imagePreview && (
                                 <Button
                                     size="sm"
                                     variant="ghost"
                                     className="mt-1"
-                                    onClick={() => setNewProperty({ ...newProperty, image: null })}
+                                    onClick={() => {
+                                        setSelectedImageFile(null);
+                                        setImagePreview(null);
+                                        // setNewProperty({ ...newProperty, image: null })
+                                    }}
                                 >
                                     Remove image
                                 </Button>
@@ -700,28 +1136,80 @@ export default function PropertyManagement() {
 
                         {/* Basic Info */}
                         <div className="space-y-2">
-                            <Label>Hotel Name*</Label>
+                            <Label>Property Name*</Label>
                             <Input
                                 required
                                 value={newProperty.brand_name}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                    if (!isWithinCharLimit(e.target.value, 150)) return
                                     setNewProperty({ ...newProperty, brand_name: normalizeTextInput(e.target.value) })
-                                }
+                                }}
                             />
                         </div>
 
-                        <div className={`grid grid-cols-1 sm:grid-cols-${(isSuperAdmin || isOwner) ? 3 : 2} gap-4`}>
+                        <div className="space-y-2">
+                            <Label>Property Logo</Label>
+
+                            <div className="relative rounded-xl border border-border overflow-hidden">
+                                {(logoPreview || (newProperty.id && !logoError)) ? (
+                                    <img
+                                        src={
+                                            logoPreview
+                                                ? logoPreview
+                                                : `${import.meta.env.VITE_API_URL}/properties/${newProperty.id}/logo`
+                                        }
+                                        alt="Property logo"
+                                        className="w-full h-28 object-contain bg-background"
+                                        onError={() => setLogoError(true)}
+                                    />
+                                ) : (
+                                    <div className="h-28 bg-muted flex items-center justify-center text-muted-foreground text-sm">
+                                        Upload property logo
+                                    </div>
+                                )}
+
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+
+                                        setLogoFile(file);
+                                        setLogoPreview(URL.createObjectURL(file));
+                                        setLogoError(false); // reset error
+                                    }}
+                                />
+                            </div>
+
+                            {logoPreview && (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                        setLogoFile(null);
+                                        setLogoPreview(null);
+                                    }}
+                                >
+                                    Remove logo
+                                </Button>
+                            )}
+                        </div>
+
+                        <div className={`grid grid-cols-1 sm:grid-cols-3 gap-4`}>
                             <div className="space-y-2">
                                 <Label>Serial Suffix</Label>
                                 <Input
                                     value={newProperty.serial_suffix}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
+                                        if (!isWithinCharLimit(e.target.value, 7)) return
                                         setNewProperty({ ...newProperty, serial_suffix: normalizeTextInput(e.target.value) })
-                                    }
+                                    }}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Room Serial Number*</Label>
+                                <Label>Room Serial*</Label>
                                 <select
                                     required
                                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
@@ -742,7 +1230,15 @@ export default function PropertyManagement() {
                                 </select>
 
                             </div>
-                            {(isSuperAdmin) && <div className="space-y-2">
+                            <div className="space-y-2">
+                                <Label>GST Number*</Label>
+                                <Input type="text" min={0} value={newProperty.gst_no}
+                                    onChange={(e) => {
+                                        if (!isWithinCharLimit(e.target.value, 50)) return
+                                        setNewProperty({ ...newProperty, gst_no: normalizeTextInput(e.target.value) })
+                                    }} />
+                            </div>
+                            {(isSuperAdmin || isOwner) && <div className="space-y-2">
                                 <Label>Property {isSuperAdmin ? "Owner" : "Admin"}</Label>
                                 <select
                                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
@@ -750,12 +1246,46 @@ export default function PropertyManagement() {
                                     onChange={(e) => setNewProperty({ ...newProperty, owner_user_id: normalizeTextInput(e.target.value) })}
                                 >
                                     <option value={null}>No {isSuperAdmin ? "Owner" : "Admin"}</option>
-                                    {users?.users?.map((user, i) => {
+                                    {isSuperAdmin ? users?.users?.map((user, i) => {
                                         return <option key={i} value={user.user_id}>{user.email}</option>
-                                    })}
+                                    }) :
+                                        propertyAdmins?.users?.map((user, i) => {
+                                            return <option key={i} value={user.user_id}>{user.email}</option>
+                                        })}
                                 </select>
                             </div>}
 
+                            <div className="space-y-2">
+                                <Label>Property Status</Label>
+                                <select
+                                    required
+                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    value={newProperty.status}
+                                    onChange={(e) =>
+                                        setNewProperty({
+                                            ...newProperty,
+                                            status: e.target.value,
+                                        })
+                                    }
+                                >
+                                    <option value="" disabled>
+                                        Select serial number
+                                    </option>
+                                    <option value="OWNED">OWNED</option>
+                                    <option value="LEASED">LEASED</option>
+                                </select>
+
+                            </div>
+                            {/* <div className="space-y-2">
+                                <Label>Banks (comma separated)</Label>
+                                <Input
+                                    placeholder="PNB,HDFC,Axis"
+                                    value={newProperty.bank_accounts}
+                                    onChange={(e) =>
+                                        setNewProperty({ ...newProperty, bank_accounts: normalizeTextInput(e.target.value) })
+                                    }
+                                />
+                            </div> */}
                         </div>
 
                         {/* Address */}
@@ -764,9 +1294,10 @@ export default function PropertyManagement() {
                             <Input
                                 required
                                 value={newProperty.address_line_1}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                    if (!isWithinCharLimit(e.target.value, 200)) return
                                     setNewProperty({ ...newProperty, address_line_1: normalizeTextInput(e.target.value) })
-                                }
+                                }}
                             />
                         </div>
 
@@ -774,11 +1305,27 @@ export default function PropertyManagement() {
                             <Label>Address Line 2</Label>
                             <Input
                                 value={newProperty.address_line_2}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                    if (!isWithinCharLimit(e.target.value, 200)) return
                                     setNewProperty({ ...newProperty, address_line_2: normalizeTextInput(e.target.value) })
+                                }}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Google Location Link</Label>
+                            <Input
+                                // placeholder="https://maps.google.com/..."
+                                value={newProperty.location_link}
+                                onChange={(e) =>
+                                    setNewProperty({
+                                        ...newProperty,
+                                        location_link: normalizeTextInput(e.target.value),
+                                    })
                                 }
                             />
                         </div>
+
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div className="space-y-2">
@@ -786,7 +1333,10 @@ export default function PropertyManagement() {
                                 <Input
                                     required
                                     value={newProperty.city}
-                                    onChange={(e) => setNewProperty({ ...newProperty, city: normalizeTextInput(e.target.value) })}
+                                    onChange={(e) => {
+                                        if (!isWithinCharLimit(e.target.value, 100)) return
+                                        setNewProperty({ ...newProperty, city: normalizeTextInput(e.target.value) })
+                                    }}
                                 />
                             </div>
 
@@ -795,7 +1345,10 @@ export default function PropertyManagement() {
                                 <Input
                                     required
                                     value={newProperty.state}
-                                    onChange={(e) => setNewProperty({ ...newProperty, state: normalizeTextInput(e.target.value) })}
+                                    onChange={(e) => {
+                                        if (!isWithinCharLimit(e.target.value, 100)) return
+                                        setNewProperty({ ...newProperty, state: normalizeTextInput(e.target.value) })
+                                    }}
                                 />
                             </div>
 
@@ -804,24 +1357,38 @@ export default function PropertyManagement() {
                                 <Input
                                     required
                                     value={newProperty.postal_code}
-                                    onChange={(e) => setNewProperty({ ...newProperty, postal_code: normalizeTextInput(e.target.value) })}
+                                    onChange={(e) => {
+                                        if (!isWithinCharLimit(e.target.value, 20)) return
+                                        setNewProperty({ ...newProperty, postal_code: normalizeTextInput(e.target.value) })
+                                    }}
                                 />
                             </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                            <div className="space-y-2">
+                                <Label>Country*</Label>
+                                <Input
+                                    required
+                                    value={newProperty.country}
+                                    onChange={(e) => {
+                                        if (!isWithinCharLimit(e.target.value, 50)) return
+                                        setNewProperty({ ...newProperty, country: normalizeTextInput(e.target.value) })
+                                    }}
+                                />
+                            </div>
+
                             <div className="space-y-2">
                                 <Label>Phone*</Label>
                                 <Input
                                     required
                                     value={newProperty.phone}
-                                    onChange={(e) => setNewProperty({ ...newProperty, phone: normalizeTextInput(e.target.value) })}
+                                    onChange={(e) => e.target.value.trim().length <= 10 && setNewProperty({ ...newProperty, phone: normalizeTextInput(e.target.value.trim()) })}
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label>Alternative Phone</Label>
                                 <Input
                                     value={newProperty.phone2}
-                                    onChange={(e) => setNewProperty({ ...newProperty, phone2: normalizeTextInput(e.target.value) })}
+                                    onChange={(e) => e.target.value.trim().length <= 10 && setNewProperty({ ...newProperty, phone2: normalizeTextInput(e.target.value.trim()) })}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -829,11 +1396,238 @@ export default function PropertyManagement() {
                                 <Input
                                     required
                                     value={newProperty.email}
-                                    onChange={(e) => setNewProperty({ ...newProperty, email: normalizeTextInput(e.target.value) })}
+                                    onChange={(e) => {
+                                        if (!isWithinCharLimit(e.target.value, 150)) return
+                                        setNewProperty({ ...newProperty, email: normalizeTextInput(e.target.value) })
+                                    }}
                                 />
                             </div>
                         </div>
+                        {(mode === "add" || (mode === "edit" && !newProperty.address_line_1_office)) && (
+                            <div className="flex items-center gap-3 pt-4">
+                                <Switch
+                                    checked={showOfficeFields}
+                                    onCheckedChange={setShowOfficeFields}
+                                />
+                                <Label>Add corporate office address</Label>
+                            </div>
+                        )}
 
+                        {showOfficeFields && (
+                            <>
+                                {/* Section Title */}
+                                <div className="pt-2">
+                                    <Label className="text-sm font-medium text-foreground">
+                                        Corporate Office Address & Contact
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                        Corporate office communication details
+                                    </p>
+                                </div>
+
+                                {/* Office Address */}
+                                <div className="space-y-2">
+                                    <Label>Office Address Line 1*</Label>
+                                    <Input
+                                        value={newProperty.address_line_1_office}
+                                        onChange={(e) => {
+                                            if (!isWithinCharLimit(e.target.value, 200)) return
+                                            setNewProperty({
+                                                ...newProperty,
+                                                address_line_1_office: normalizeTextInput(e.target.value),
+                                            })
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Office Address Line 2</Label>
+                                    <Input
+                                        value={newProperty.address_line_2_office}
+                                        onChange={(e) => {
+                                            if (!isWithinCharLimit(e.target.value, 200)) return
+                                            setNewProperty({
+                                                ...newProperty,
+                                                address_line_2_office: normalizeTextInput(e.target.value),
+                                            })
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>City*</Label>
+                                        <Input
+                                            value={newProperty.city_office}
+                                            onChange={(e) => {
+                                                if (!isWithinCharLimit(e.target.value, 100)) return
+                                                setNewProperty({
+                                                    ...newProperty,
+                                                    city_office: normalizeTextInput(e.target.value),
+                                                })
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>State*</Label>
+                                        <Input
+                                            value={newProperty.state_office}
+                                            onChange={(e) => {
+                                                if (!isWithinCharLimit(e.target.value, 100)) return
+                                                setNewProperty({
+                                                    ...newProperty,
+                                                    state_office: normalizeTextInput(e.target.value),
+                                                })
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Postal Code*</Label>
+                                        <Input
+                                            value={newProperty.postal_code_office}
+                                            onChange={(e) => {
+                                                if (!isWithinCharLimit(e.target.value, 20)) return
+                                                setNewProperty({
+                                                    ...newProperty,
+                                                    postal_code_office: normalizeTextInput(e.target.value),
+                                                })
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Country*</Label>
+                                        <Input
+                                            value={newProperty.country_office}
+                                            onChange={(e) => {
+                                                if (!isWithinCharLimit(e.target.value, 50)) return
+                                                setNewProperty({
+                                                    ...newProperty,
+                                                    country_office: normalizeTextInput(e.target.value),
+                                                })
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Phone*</Label>
+                                        <Input
+                                            value={newProperty.phone_office}
+                                            onChange={(e) => e.target.value.trim().length <= 10 &&
+                                                setNewProperty({
+                                                    ...newProperty,
+                                                    phone_office: normalizeTextInput(e.target.value.trim()),
+                                                })
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Alternative Phone</Label>
+                                        <Input
+                                            value={newProperty.phone2_office}
+                                            onChange={(e) => e.target.value.length <= 10 &&
+                                                setNewProperty({
+                                                    ...newProperty,
+                                                    phone2_office: normalizeTextInput(e.target.value),
+                                                })
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Office Email*</Label>
+                                        <Input
+                                            value={newProperty.email_office}
+                                            onChange={(e) => {
+                                                if (!isWithinCharLimit(e.target.value, 150)) return
+                                                setNewProperty({
+                                                    ...newProperty,
+                                                    email_office: normalizeTextInput(e.target.value),
+                                                })
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+
+                            </>
+                        )}
+
+                        <div className="flex items-center gap-3 pt-4">
+                            <Switch
+                                checked={hasBankDetails}
+                                onCheckedChange={setHasBankDetails}
+                            />
+                            <Label>Add Bank Details</Label>
+                            {hasBankDetails && <Button
+                                size="sm"
+                                variant="heroOutline"
+                                onClick={addBankAccount}
+                            >
+                                + Add Account
+                            </Button>}
+                        </div>
+
+                        {hasBankDetails && bankAccounts.map((bank, index) => (
+                            <div
+                                key={index}
+                                className="grid grid-cols-1 sm:grid-cols-2 gap-4 border border-border rounded-xl p-4"
+                            >
+                                <div>
+                                    <Label>Account Holder Name</Label>
+                                    <Input
+                                        value={bank.account_holder_name}
+                                        onChange={(e) =>
+                                            updateBankField(index, "account_holder_name", e.target.value)
+                                        }
+                                    />
+                                </div>
+
+                                <div>
+                                    <Label>Account Number</Label>
+                                    <Input
+                                        value={bank.account_number}
+                                        onChange={(e) =>
+                                            updateBankField(index, "account_number", e.target.value)
+                                        }
+                                    />
+                                </div>
+
+                                <div>
+                                    <Label>IFSC Code</Label>
+                                    <Input
+                                        value={bank.ifsc_code}
+                                        onChange={(e) =>
+                                            updateBankField(index, "ifsc_code", e.target.value.toUpperCase())
+                                        }
+                                    />
+                                </div>
+
+                                <div>
+                                    <Label>Bank Name</Label>
+                                    <Input
+                                        value={bank.bank_name}
+                                        onChange={(e) =>
+                                            updateBankField(index, "bank_name", e.target.value)
+                                        }
+                                    />
+                                </div>
+
+                                {bankAccounts.length > 1 && (
+                                    <div className="sm:col-span-2 flex justify-end">
+                                        <Button
+                                            size="sm"
+                                            variant="destructive"
+                                            onClick={() => removeBankAccount(index)}
+                                        >
+                                            Remove
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                         {/* Timings */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -850,18 +1644,18 @@ export default function PropertyManagement() {
                         </div>
 
                         {/* Numbers */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                             {/* <Input type="number" placeholder="Total Rooms"
                                 onChange={(e) => setNewProperty({ ...newProperty, total_rooms: normalizeTextInput(e.target.value)})} /> */}
                             <div className="space-y-2">
                                 <Label>Total Floors*</Label>
                                 <Input
-                                    type="number"
+                                    type="text"
                                     disabled={mode === "edit"}
                                     min={1}
                                     value={newProperty.total_floors}
                                     onChange={(e) => {
-                                        const value = Number(e.target.value) || 0;
+                                        const value = normalizeNumberInput(e.target.value) || 0;
                                         syncFloors(value);
                                     }}
                                 />
@@ -869,12 +1663,12 @@ export default function PropertyManagement() {
                             </div>
                             <div className="space-y-2">
                                 <Label>GST %</Label>
-                                <Input type="number" min={0} value={newProperty.gst}
+                                <Input type="number" min={0} max={100} value={newProperty.gst}
                                     onChange={(e) => setNewProperty({ ...newProperty, gst: +normalizeTextInput(e.target.value) })} />
                             </div>
                             <div className="space-y-2">
                                 <Label>Room Tax %</Label>
-                                <Input type="number" min={0} value={newProperty.room_tax_rate}
+                                <Input type="number" min={0} max={100} value={newProperty.room_tax_rate}
                                     onChange={(e) => setNewProperty({ ...newProperty, room_tax_rate: +normalizeTextInput(e.target.value) })} />
                             </div>
                         </div>
@@ -904,7 +1698,7 @@ export default function PropertyManagement() {
 
                                         {/* Rooms Count */}
                                         <Input
-                                            type="number"
+                                            type="text"
                                             className="border-none"
                                             min={0}
                                             disabled={mode === "edit"}
@@ -916,7 +1710,7 @@ export default function PropertyManagement() {
                                                     const floors = [...prev.floors];
                                                     floors[index] = {
                                                         ...floors[index],
-                                                        total_rooms: value,
+                                                        total_rooms: normalizeNumberInput(value.toString()),
                                                     };
                                                     return { ...prev, floors };
                                                 });
@@ -975,7 +1769,7 @@ export default function PropertyManagement() {
 
 
                         {/* Policies */}
-                        <div className="space-y-2">
+                        {/* <div className="space-y-2">
                             <Label>Smoking Policy</Label>
                             <textarea
                                 className="w-full min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -984,9 +1778,9 @@ export default function PropertyManagement() {
                                     setNewProperty({ ...newProperty, smoking_policy: normalizeTextInput(e.target.value) })
                                 }
                             />
-                        </div>
+                        </div> */}
 
-                        <div className="space-y-2">
+                        {/* <div className="space-y-2">
                             <Label>Cancellation Policy</Label>
                             <textarea
                                 className="w-full min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -995,10 +1789,10 @@ export default function PropertyManagement() {
                                     setNewProperty({ ...newProperty, cancellation_policy: normalizeTextInput(e.target.value) })
                                 }
                             />
-                        </div>
+                        </div> */}
 
                         {/* Toggles */}
-                        <div className="flex items-center gap-6">
+                        {/* <div className="flex items-center gap-6">
                             <div className="flex items-center gap-2">
                                 <Switch
                                     checked={newProperty.is_active}
@@ -1018,7 +1812,7 @@ export default function PropertyManagement() {
                                 />
                                 <Label>Pet Friendly</Label>
                             </div>
-                        </div>
+                        </div> */}
 
                         {/* Actions */}
                         <div className="flex justify-end gap-3 pt-4 border-t border-border">

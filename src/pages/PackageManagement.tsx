@@ -20,10 +20,12 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { useAppSelector } from "@/redux/hook";
-import { useCreatePackageMutation, useGetMyPropertiesQuery, useGetPackageByIdQuery, useGetPackagesByPropertyQuery, useUpdatePackageMutation } from "@/redux/services/hmsApi";
+import { useCreatePackageMutation, useGetMyPropertiesQuery, useGetPackageByIdQuery, useGetPackagesByPropertyQuery, useUpdatePackageMutation, useUpdatePackagesBulkMutation } from "@/redux/services/hmsApi";
 import AppHeader from "@/components/layout/AppHeader";
 import { toast } from "react-toastify";
 import { selectIsAdmin, selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
+import { normalizeNumberInput, normalizeTextInput } from "@/utils/normalizeTextInput";
+import { isWithinCharLimit } from "@/utils/isWithinCharLimit";
 
 /* -------------------- Types -------------------- */
 type PackageListItem = {
@@ -38,6 +40,7 @@ type PackageDetail = {
     description: string;
     base_price: string;
     is_active: boolean;
+    system_generated: boolean
 };
 
 /* -------------------- Component -------------------- */
@@ -51,8 +54,12 @@ export default function PackageManagement() {
         description: "",
         base_price: "",
         is_active: true,
+        system_generated: true
     });
     const [selectedPackageId, setSelectedPackageId] = useState(0)
+    const [isPriceEditMode, setIsPriceEditMode] = useState(false);
+    const [editedPrices, setEditedPrices] = useState<Record<string, string>>({});
+
 
     const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
     const { data: properties, isLoading: propertiesLoading } = useGetMyPropertiesQuery(undefined, {
@@ -73,6 +80,7 @@ export default function PackageManagement() {
 
     const [createPackage] = useCreatePackageMutation()
     const [updatePackage] = useUpdatePackageMutation()
+    const [updatePackagesBulk] = useUpdatePackagesBulkMutation()
 
     /* -------------------- Handlers -------------------- */
     const handleOpenAdd = () => {
@@ -82,6 +90,7 @@ export default function PackageManagement() {
             description: "",
             base_price: "",
             is_active: true,
+            system_generated: true
         });
         setSheetOpen(true);
     };
@@ -104,31 +113,65 @@ export default function PackageManagement() {
             const promise = createPackage(payload).unwrap()
 
             toast.promise(promise, {
-                pending: "Creating package",
+                pending: "Creating plan",
                 success: "Package created successfully",
-                error: "Error creating package"
+                error: "Error creating plan"
             })
         } else {
             const promise = updatePackage({ payload, packageId: selectedPackageId }).unwrap()
 
             toast.promise(promise, {
-                pending: "Updating package",
+                pending: "Updating plan",
                 success: "Package updated successfully",
-                error: "Error updating package"
+                error: "Error updating plan"
             })
         }
 
         setSheetOpen(false);
     };
 
+    const handlePriceChange = (id: string, value: string) => {
+        setEditedPrices(prev => ({
+            ...prev,
+            [id]: normalizeNumberInput(value).toString(),
+        }));
+    };
+
+    const hasPriceChanges = Object.keys(editedPrices).length > 0;
+
+    const handleBulkPriceUpdate = () => {
+        const payload = Object.entries(editedPrices).map(([id, base_price]) => ({
+            id,
+            base_price: Number(base_price),
+        }));
+
+        console.log("Bulk update payload:", payload);
+
+        const promise = updatePackagesBulk({ packages: payload, propertyId: selectedPropertyId }).unwrap()
+
+        toast.promise(promise, {
+            pending: "Updating plans...",
+            error: "Error updating plans",
+            success: "Plans updated successfully"
+        })
+
+        setIsPriceEditMode(false);
+        setEditedPrices({});
+    };
+
     useEffect(() => {
         if (packageLoading) return
-        setSelectedPackage(selectedPackageData?.data)
+        let selectedPackage = { ...selectedPackageData?.data }
+        console.log("🚀 ~ PackageManagement ~ selectedPackage:", selectedPackage)
+        if (selectedPackage && selectedPackage.base_price == 0.00) {
+            selectedPackage.base_price = ""
+        }
+        setSelectedPackage(selectedPackage)
     }, [selectedPackageData, packageLoading])
 
     useEffect(() => {
         if (propertiesLoading || !properties || !Array.isArray(properties?.properties)) return
-        const propertyId = properties?.properties[0].id
+        const propertyId = properties?.properties[0]?.id
         setSelectedPropertyId(propertyId)
     }, [properties])
 
@@ -148,20 +191,59 @@ export default function PackageManagement() {
                     <div className="mb-6 flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-foreground">
-                                Packages
+                                Plans
                             </h1>
                             <p className="text-sm text-muted-foreground">
-                                Manage room packages and pricing
+                                Manage room plans and pricing
                             </p>
                         </div>
 
-                        <Button variant="hero" disabled={!(isSuperAdmin || isOwner || isAdmin)} onClick={handleOpenAdd}>
-                            Add Package
-                        </Button>
+                        <div className="flex gap-2">
+                            {!isPriceEditMode &&
+                                <>
+                                    <Button
+                                        variant="heroOutline"
+                                        // disabled={!(isSuperAdmin || isOwner || isAdmin)}
+                                        onClick={() => {
+                                            setIsPriceEditMode(true);
+                                            setEditedPrices({});
+                                        }}
+                                    >
+                                        Edit Prices
+                                    </Button>
+                                    <Button variant="hero" onClick={handleOpenAdd}>
+                                        Add Plan
+                                    </Button>
+                                </>
+                            }
+
+                            {isPriceEditMode && (
+                                <>
+                                    <Button
+                                        variant="hero"
+                                        disabled={!hasPriceChanges}
+                                        onClick={handleBulkPriceUpdate}
+                                    >
+                                        Update Prices
+                                    </Button>
+                                    <Button
+                                        variant="hero"
+                                        // disabled={!hasPriceChanges}
+                                        onClick={() => {
+                                            setIsPriceEditMode(false);
+                                            setEditedPrices({});
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+
                     </div>
 
                     {/* Property Filter */}
-                    <div className="mb-4 max-w-sm space-y-2">
+                    {(isSuperAdmin || isOwner) && <div className="mb-4 max-w-sm space-y-2">
                         <Label>Property</Label>
                         <select
                             className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
@@ -178,7 +260,7 @@ export default function PackageManagement() {
                                 ))}
                         </select>
 
-                    </div>
+                    </div>}
 
 
                     {/* Table */}
@@ -186,7 +268,9 @@ export default function PackageManagement() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Package Name</TableHead>
+                                    <TableHead>Plan Name</TableHead>
+                                    <TableHead>Description</TableHead>
+                                    <TableHead>Base Price</TableHead>
                                     <TableHead className="text-right">
                                         Action
                                     </TableHead>
@@ -199,6 +283,27 @@ export default function PackageManagement() {
                                         <TableCell className="font-medium">
                                             {pkg.package_name}
                                         </TableCell>
+                                        <TableCell className="font-medium">
+                                            {pkg.description}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
+                                            {isPriceEditMode ? (
+                                                <Input
+                                                    type="text"
+                                                    className="h-8"
+                                                    value={
+                                                        editedPrices[pkg.id] ??
+                                                        Number(pkg.base_price).toString()
+                                                    }
+                                                    onChange={(e) =>
+                                                        handlePriceChange(pkg.id, e.target.value)
+                                                    }
+                                                />
+                                            ) : (
+                                                Number(pkg.base_price).toFixed()
+                                            )}
+                                        </TableCell>
+
 
                                         <TableCell className="text-right">
                                             <Button
@@ -208,7 +313,7 @@ export default function PackageManagement() {
                                                     handleOpenEdit(pkg)
                                                 }
                                             >
-                                                {!(isSuperAdmin || isOwner || isAdmin) ? "View" : "Manage"}
+                                                {"Manage"}
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -220,7 +325,7 @@ export default function PackageManagement() {
                                             colSpan={2}
                                             className="text-center py-6 text-muted-foreground"
                                         >
-                                            No packages found
+                                            No plans found
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -233,9 +338,19 @@ export default function PackageManagement() {
             {/* -------------------- Add / Edit Sheet -------------------- */}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                 <SheetContent
-                    side="right"
-                    className="w-full sm:max-w-xl overflow-y-auto"
-                >
+                    className="
+                            fixed
+                            left-1/2
+                            top-1/2
+                            -translate-x-1/2
+                            -translate-y-1/2
+                            w-full
+                            sm:max-w-xl
+                            max-h-[88vh]
+                            overflow-y-auto
+                            rounded-2xl
+                            scrollbar-hide
+                        ">
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -244,60 +359,105 @@ export default function PackageManagement() {
                         <SheetHeader>
                             <SheetTitle>
                                 {mode === "add"
-                                    ? "Add Package"
-                                    : "Edit Package"}
+                                    ? "Add plan"
+                                    : "Edit plan"}
                             </SheetTitle>
                         </SheetHeader>
 
                         {/* Package Name */}
                         <div className="space-y-2">
-                            <Label>Package Name</Label>
-                            <Input
-                                disabled={!(isSuperAdmin || isOwner || isAdmin)}
-                                value={selectedPackage?.package_name}
-                                onChange={(e) =>
-                                    setSelectedPackage((prev) => ({
-                                        ...prev,
-                                        package_name: e.target.value,
-                                    }))
-                                }
-                            />
+                            <Label>Plan Name</Label>
+                            {(mode === "edit" && selectedPackage?.system_generated) ?
+                                <p
+                                    className="
+                                        h-10
+                                        w-full
+                                        rounded-xl
+                                        bg-background
+                                        px-3
+                                        flex
+                                        items-center
+                                        text-sm
+                                        text-foreground
+                                        cursor-default
+                                        select-text
+                                    "
+                                >
+                                    {selectedPackage?.package_name}
+                                </p> :
+                                <Input
+                                    // readOnly={}
+                                    value={selectedPackage?.package_name}
+                                    onChange={(e) => {
+                                        const next = e.target.value
+                                        if (isWithinCharLimit(next, 50)) {
+                                            setSelectedPackage((prev) => ({
+                                                ...prev,
+                                                package_name: normalizeTextInput(e.target.value),
+                                            }))
+                                        }
+                                    }}
+                                />
+                            }
+
                         </div>
 
                         {/* Description */}
                         <div className="space-y-2">
                             <Label>Description</Label>
-                            <textarea
-                                disabled={!(isSuperAdmin || isOwner || isAdmin)}
-                                className="w-full min-h-[100px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
-                                value={selectedPackage?.description}
-                                onChange={(e) =>
-                                    setSelectedPackage((prev) => ({
-                                        ...prev,
-                                        description: e.target.value,
-                                    }))
-                                }
-                            />
+                            {(mode === "edit" && selectedPackage?.system_generated) ?
+                                <p
+                                    className="
+                                        h-10
+                                        w-full
+                                        rounded-xl
+                                        bg-background
+                                        px-3
+                                        flex
+                                        items-center
+                                        text-sm
+                                        text-foreground
+                                        cursor-default
+                                        select-text
+                                    "
+                                >
+                                    {selectedPackage?.description}
+                                </p>
+                                : <textarea
+                                    // readOnly={!(isSuperAdmin || isOwner || isAdmin) || (mode === "edit" && selectedPackage?.system_generated)}
+                                    className="w-full min-h-[100px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                                    value={selectedPackage?.description}
+                                    onChange={(e) => {
+                                        const next = e.target.value
+                                        if (isWithinCharLimit(next, 50)) {
+                                            setSelectedPackage((prev) => ({
+                                                ...prev,
+                                                description: normalizeTextInput(e.target.value),
+                                            }))
+                                        }
+                                    }
+                                    }
+                                />}
                         </div>
 
                         {/* Price */}
                         <div className="space-y-2">
                             <Label>Base Price</Label>
                             <Input
-                                disabled={!(isSuperAdmin || isOwner || isAdmin)}
+                                // disabled={!(isSuperAdmin || isOwner || isAdmin)}
                                 type="number"
                                 value={selectedPackage?.base_price}
                                 onChange={(e) =>
                                     setSelectedPackage((prev) => ({
                                         ...prev,
-                                        base_price: e.target.value,
+                                        base_price: normalizeTextInput(e.target.value),
                                     }))
                                 }
                             />
                         </div>
 
                         {/* Active */}
-                        <div className="flex items-center gap-2">
+                        {/* <div className="flex items-center gap-2">
                             <Switch
                                 disabled={!(isSuperAdmin || isOwner || isAdmin)}
                                 checked={selectedPackage?.is_active}
@@ -309,7 +469,7 @@ export default function PackageManagement() {
                                 }
                             />
                             <Label>Active</Label>
-                        </div>
+                        </div> */}
 
                         {/* Actions */}
                         <div className="flex justify-end gap-3 pt-4 border-t border-border">
@@ -320,9 +480,10 @@ export default function PackageManagement() {
                                 Cancel
                             </Button>
 
-                            <Button variant="hero" disabled={!(isSuperAdmin || isOwner || isAdmin)} onClick={handleSubmit}>
+                            <Button variant="hero"
+                                disabled={!selectedPackage?.base_price || !selectedPackage?.package_name} onClick={handleSubmit}>
                                 {mode === "add"
-                                    ? "Create Package"
+                                    ? "Create Plan"
                                     : "Save Changes"}
                             </Button>
                         </div>

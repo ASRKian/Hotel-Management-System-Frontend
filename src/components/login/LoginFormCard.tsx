@@ -21,8 +21,8 @@ import { loginSuccess } from "@/redux/slices/isLoggedInSlice.ts";
 const SUPPORT_EMAIL = "support@atithiflow.com";
 
 const LoginFormCard = () => {
-  const [email, setEmail] = useState("superadmin@atithiflow.com");
-  const [password, setPassword] = useState("ChangeMe@123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
@@ -58,13 +58,15 @@ const LoginFormCard = () => {
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
       const { data, error } = await login()
+      console.log("🚀 ~ handleSubmit ~ data:", data)
       setIsLoading(false);
       if (error) {
         setSubmitMessage(error.message);
         return;
       }
       const authToken = data.session.access_token
-      localStorage.setItem("authToken", authToken)
+      console.log("🚀 ~ handleSubmit ~ authToken:", authToken)
+      localStorage.setItem("access_token", authToken)
       setSubmitMessage("Logged in success")
       dispatch(loginSuccess())
       navigate("/properties")
