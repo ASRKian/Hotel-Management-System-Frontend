@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useGetMyPropertiesQuery, useRoomsStatusQuery } from "@/redux/services/hmsApi";
+import { useGetMyPropertiesQuery, useGetSidebarLinksQuery, useRoomsStatusQuery } from "@/redux/services/hmsApi";
 import { useAppSelector } from "@/redux/hook";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
+import { useLocation, useNavigate } from "react-router-dom";
+import { usePermission } from "@/rbac/usePermission";
 
 /* ---------------- Types ---------------- */
 type Room = {
@@ -108,6 +110,8 @@ export default function RoomStatusBoard() {
         skip: !isLoggedIn || !propertyId
     })
 
+    const navigate = useNavigate()
+
     const filteredCheckIns = data?.checking_in || [];
     const filteredCheckOuts = data?.checking_out || [];
 
@@ -157,6 +161,11 @@ export default function RoomStatusBoard() {
         }
     }, [myProperties]);
 
+
+    const pathname = useLocation().pathname
+    usePermission(pathname)
+    const { permission: bookingPermission } = usePermission("/bookings", { autoRedirect: false })
+
     return (
         <div className="min-h-screen bg-background">
             <AppHeader />
@@ -165,7 +174,9 @@ export default function RoomStatusBoard() {
             <main className="lg:ml-64 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden">
                 <section className="flex-1 overflow-y-auto scrollbar-hide p-6 lg:p-8 space-y-6">
                     {/* ---------- Header ---------- */}
-                    <div className="flex items-center justify-between">
+                    <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr_0.8fr_0.8fr] items-end gap-4">
+
+                        {/* Title + Legend */}
                         <div className="flex items-start justify-between">
                             <div>
                                 <h1 className="text-2xl font-bold">Room Status</h1>
@@ -175,7 +186,7 @@ export default function RoomStatusBoard() {
                             </div>
 
                             {/* Status Legend */}
-                            <div className="relative group">
+                            <div className="relative group mt-1">
                                 <div className="flex items-center gap-1 cursor-pointer">
                                     {ROOM_STATUS_LEGEND.map((s) => (
                                         <span
@@ -208,37 +219,48 @@ export default function RoomStatusBoard() {
                             </div>
                         </div>
 
-                        {(isSuperAdmin || isOwner) && <div className="space-y-2">
-                            <Label>Properties</Label>
+                        {/* Property Select */}
+                        {(isSuperAdmin || isOwner) && (
+                            <div className="space-y-2">
+                                <Label>Properties</Label>
+                                <select
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
+                                    value={propertyId}
+                                    onChange={(e) => setPropertyId(e.target.value)}
+                                >
+                                    <option value="" disabled>Select property</option>
+                                    {!myPropertiesLoading &&
+                                        myProperties?.properties?.map((property) => (
+                                            <option key={property.id} value={property.id}>
+                                                {property.brand_name}
+                                            </option>
+                                        ))}
+                                </select>
+                            </div>
+                        )}
 
-                            <select
-                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
-                                value={propertyId}
-                                onChange={(e) => setPropertyId(e.target.value)}
-                            >
-                                <option value="" disabled>
-                                    Select property
-                                </option>
-
-                                {!myPropertiesLoading &&
-                                    myProperties?.properties?.map((property) => (
-                                        <option key={property.id} value={property.id}>
-                                            {property.brand_name}
-                                        </option>
-                                    ))}
-                            </select>
-                        </div>}
-
-                        <div className="w-48">
+                        {/* Date */}
+                        <div className="space-y-2">
                             <Label>Date</Label>
                             <Input
                                 type="date"
                                 value={selectedDate}
-                                onChange={(e) =>
-                                    setSelectedDate(e.target.value)
-                                }
+                                onChange={(e) => setSelectedDate(e.target.value)}
                             />
                         </div>
+
+                        {/* Button */}
+                        {bookingPermission?.can_create && <div className="flex items-end">
+                            <Button
+                                disabled={!bookingPermission?.can_create}
+                                size="sm"
+                                variant="heroOutline"
+                                onClick={() => navigate("/reservation")}
+                                className="w-full"
+                            >
+                                Add New Booking
+                            </Button>
+                        </div>}
                     </div>
 
                     {/* ---------- Summary ---------- */}

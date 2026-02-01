@@ -12,8 +12,9 @@ import {
     useUpdateOrderStatusMutation
 } from "@/redux/services/hmsApi";
 import { OrderItemsModal } from "./OrderItemsModal";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { usePermission } from "@/rbac/usePermission";
 
 const ORDER_STATUSES = ["New", "Preparing", "Ready", "Delivered", "Cancelled"];
 const PAYMENT_STATUSES = ["Pending", "Paid", "Failed", "Refunded"];
@@ -105,6 +106,9 @@ export function OrdersManagement() {
         })
     };
 
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+
     return (
         <div className="h-screen bg-background overflow-hidden">
             <AppHeader />
@@ -174,7 +178,7 @@ export function OrdersManagement() {
                             )}
 
                             {/* New Order Button */}
-                            <div className="flex flex-col justify-end">
+                            {permission?.can_create && <div className="flex flex-col justify-end">
                                 <Label className="text-[11px] text-transparent mb-1">Action</Label>
                                 <Button
                                     size="sm"
@@ -186,7 +190,7 @@ export function OrdersManagement() {
                                 >
                                     New Order
                                 </Button>
-                            </div>
+                            </div>}
 
                         </div>
                     </div>
@@ -236,7 +240,7 @@ export function OrdersManagement() {
                                             className="h-9 rounded-lg border px-2 text-sm"
                                             value={order.order_status}
                                             onChange={(e) =>
-                                                handleOrderStatusUpdate(order.id, e.target.value)
+                                                permission?.can_create && handleOrderStatusUpdate(order.id, e.target.value)
                                             }
                                         >
                                             {ORDER_STATUSES.map((s) => (
@@ -254,7 +258,7 @@ export function OrdersManagement() {
                                             className="h-9 rounded-lg border px-2 text-sm"
                                             value={order.payment_status}
                                             onChange={(e) =>
-                                                handlePaymentStatusUpdate(order.id, e.target.value)
+                                                permission?.can_create && handlePaymentStatusUpdate(order.id, e.target.value)
                                             }
                                         >
                                             {PAYMENT_STATUSES.map((s) => (

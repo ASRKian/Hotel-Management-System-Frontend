@@ -15,6 +15,8 @@ import { useCreateMenuItemMutation, useGetMyPropertiesQuery, useGetPropertyMenuQ
 import { useAppSelector } from "@/redux/hook";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 import { normalizeNumberInput } from "@/utils/normalizeTextInput";
+import { useLocation } from "react-router-dom";
+import { usePermission } from "@/rbac/usePermission";
 
 type MenuItem = {
     id: string;
@@ -186,6 +188,9 @@ export default function MenuMaster() {
         }
     }
 
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+
     return (
         <div className="h-screen bg-background overflow-hidden">
             <AppHeader />
@@ -226,7 +231,7 @@ export default function MenuMaster() {
                                 </select>
                             </div>
                         )}
-                        <Button
+                        {permission?.can_create && <Button
                             variant="hero"
                             onClick={() => {
                                 setForm({
@@ -242,7 +247,7 @@ export default function MenuMaster() {
                             }}
                         >
                             Add Menu Item
-                        </Button>
+                        </Button>}
                     </div>
 
                     {/* List */}
@@ -285,13 +290,13 @@ export default function MenuMaster() {
                                     >
                                         View
                                     </Button>
-                                    <Button
+                                    {permission?.can_create && <Button
                                         size="sm"
                                         variant="heroOutline"
                                         onClick={() => openEdit(item)}
                                     >
                                         Edit
-                                    </Button>
+                                    </Button>}
                                 </div>
                             </div>
                         ))}

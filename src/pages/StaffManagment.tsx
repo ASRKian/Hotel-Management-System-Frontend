@@ -30,6 +30,8 @@ import { validateStaff } from "@/utils/validators";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 import DatePicker from "react-datepicker";
 import countries from '../utils/countries.json'
+import { useLocation } from "react-router-dom";
+import { usePermission } from "@/rbac/usePermission";
 
 /* -------------------- Types -------------------- */
 type Staff = {
@@ -287,6 +289,9 @@ export default function StaffManagement() {
     };
 
 
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+
     return (
         <div className="min-h-screen bg-background">
             <AppHeader
@@ -308,7 +313,7 @@ export default function StaffManagement() {
                             </p>
                         </div>
 
-                        <Button
+                        {permission?.can_create && <Button
                             variant="hero"
                             onClick={() => {
                                 setMode("add");
@@ -316,7 +321,7 @@ export default function StaffManagement() {
                             }}
                         >
                             Add Staff
-                        </Button>
+                        </Button>}
                     </div>
 
                     {/* Staff Table */}
@@ -1135,9 +1140,9 @@ export default function StaffManagement() {
                             >
                                 Cancel
                             </Button>
-                            <Button variant="hero" disabled={creating || updating} onClick={handleSubmit}>
+                            {permission?.can_create && <Button variant="hero" disabled={creating || updating} onClick={handleSubmit}>
                                 {mode === "add" ? "Create Staff" : "Save Changes"}
-                            </Button>
+                            </Button>}
                         </div>
                     </motion.div>
                 </SheetContent>

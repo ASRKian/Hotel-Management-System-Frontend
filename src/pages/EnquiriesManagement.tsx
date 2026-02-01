@@ -14,7 +14,8 @@ import { useGetMyPropertiesQuery, useGetPropertyEnquiriesQuery, useUpdateEnquiry
 import { useAppSelector } from "@/redux/hook";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 import { toast } from "react-toastify";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { usePermission } from "@/rbac/usePermission";
 
 type EnquiryStatus =
     | "open"
@@ -153,6 +154,11 @@ export default function EnquiriesManagement() {
         });
     }
 
+
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+    const { permission: bookingPermission } = usePermission("/bookings", { autoRedirect: false })
+
     return (
         <div className="h-screen bg-background overflow-hidden">
             <AppHeader />
@@ -193,14 +199,14 @@ export default function EnquiriesManagement() {
                             </div>
                         )}
 
-                        <Button
+                        {permission?.can_create && <Button
                             variant="hero"
                             onClick={() => {
                                 navigate("/create-enquiry")
                             }}
                         >
                             New Enquiry
-                        </Button>
+                        </Button>}
 
                     </div>
 
@@ -254,7 +260,7 @@ export default function EnquiriesManagement() {
                                     )}
                                 </div>
 
-                                <div className="flex flex-col gap-2">
+                                {permission?.can_create && <div className="flex flex-col gap-2">
                                     <Button
                                         size="sm"
                                         variant="heroOutline"
@@ -263,15 +269,15 @@ export default function EnquiriesManagement() {
                                         Manage
                                     </Button>
 
-                                    <Button
+                                    {bookingPermission?.can_create && <Button
                                         size="sm"
                                         variant="hero"
                                         disabled={e.is_reserved || e.status === "converted"}
                                         onClick={() => handleBook(e)}
                                     >
                                         Book
-                                    </Button>
-                                </div>
+                                    </Button>}
+                                </div>}
                             </div>
                         ))}
                     </div>

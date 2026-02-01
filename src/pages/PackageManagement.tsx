@@ -26,6 +26,9 @@ import { toast } from "react-toastify";
 import { selectIsAdmin, selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 import { normalizeNumberInput, normalizeTextInput } from "@/utils/normalizeTextInput";
 import { isWithinCharLimit } from "@/utils/isWithinCharLimit";
+import { permission } from "process";
+import { useLocation } from "react-router-dom";
+import { usePermission } from "@/rbac/usePermission";
 
 /* -------------------- Types -------------------- */
 type PackageListItem = {
@@ -175,6 +178,9 @@ export default function PackageManagement() {
         setSelectedPropertyId(propertyId)
     }, [properties])
 
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+
     return (
         <div className="min-h-screen bg-background">
             <AppHeader
@@ -199,7 +205,7 @@ export default function PackageManagement() {
                         </div>
 
                         <div className="flex gap-2">
-                            {!isPriceEditMode &&
+                            {!isPriceEditMode && permission?.can_create &&
                                 <>
                                     <Button
                                         variant="heroOutline"

@@ -42,6 +42,7 @@ import { CreateOrder } from "./pages/CreateOrder.tsx";
 import { RestaurantTables } from "./pages/RestaurantTable.tsx";
 import KitchenInventory from "./pages/KitchenInventory.tsx";
 import { useGetSidebarLinksQuery } from "./redux/services/hmsApi.ts";
+import UnauthorizedAccessPage from "./pages/UnauthorizedAccessPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -61,27 +62,28 @@ const App = () => {
     skip: !isLoggedIn
   })
 
-  const unsafePaths = ["/", "/platform", "/contact", "/privacy-policy", "/terms-of-service", "/reservation", "/create-enquiry", "/create-order"]
+  const unsafePaths = ["/", "/platform", "/contact", "/privacy-policy", "/terms-of-service", "/unauthorized-access"]
+  const loggedInPaths = ["/reservation", "/create-enquiry", "/create-order"]
 
   useEffect(() => {
     if (!isLoggedIn || !sidebarLinks?.sidebarLinks) return;
 
     const accessible = sidebarLinks.sidebarLinks.map(d => d.endpoint);
 
-    setAccessiblePaths([...new Set([...accessible, ...unsafePaths])]);
+    setAccessiblePaths([...new Set([...accessible, ...unsafePaths, ...loggedInPaths])]);
   }, [sidebarLinks, isLoggedIn]);
 
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    if (!accessiblePaths.length) return;
+  // useEffect(() => {
+  //   if (!isLoggedIn) return;
+  //   if (!accessiblePaths.length) return;
 
-    if (accessiblePaths.includes(pathname)) return;
+  //   if (accessiblePaths.includes(pathname)) return;
 
-    const redirectPath = accessiblePaths[0];
-    if (redirectPath) {
-      navigate(redirectPath, { replace: true });
-    }
-  }, [pathname, accessiblePaths, isLoggedIn, navigate]);
+  //   const redirectPath = accessiblePaths[0];
+  //   if (redirectPath) {
+  //     navigate(redirectPath, { replace: true });
+  //   }
+  // }, [pathname, accessiblePaths, isLoggedIn, navigate]);
 
   useEffect(() => {
     if (!apiLoaded) return;
@@ -97,10 +99,11 @@ const App = () => {
 
   useEffect(() => {
     if (apiLoaded && !isLoggedIn) {
+      console.log("🚀 ~ App ~ apiLoaded: here", apiLoaded, isLoggedIn)
       if (!unsafePaths.includes(pathname)) {
         navigate("/login", { replace: true })
       }
-      dispatch(setApiLoaded(false))
+      // dispatch(setApiLoaded(false))
     }
   }, [isLoggedIn, apiLoaded])
 
@@ -139,7 +142,8 @@ const App = () => {
           <Route path="/create-order" element={<CreateOrder />} />
           <Route path="/restaurant-tables" element={<RestaurantTables />} />
           <Route path="/kitchen-inventory" element={<KitchenInventory />} />
-          <Route path="/spinner" element={<LogoSpinner />} />
+          <Route path="/kitchen-inventory" element={<KitchenInventory />} />
+          <Route path="/unauthorized-access" element={<UnauthorizedAccessPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

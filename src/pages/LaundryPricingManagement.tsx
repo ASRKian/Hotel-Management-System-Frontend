@@ -23,6 +23,8 @@ import { useAppSelector } from "@/redux/hook";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 import { useCreateLaundryPricingMutation, useGetMyPropertiesQuery, useGetPropertyLaundryPricingQuery, useUpdateLaundryPricingMutation } from "@/redux/services/hmsApi";
 import { normalizeNumberInput } from "@/utils/normalizeTextInput";
+import { usePermission } from "@/rbac/usePermission";
+import { useLocation } from "react-router-dom";
 
 /* ---------------- Types ---------------- */
 type LaundryItem = {
@@ -183,6 +185,10 @@ export default function LaundryPricingManagement() {
         }
     };
 
+
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+
     /* ---------------- UI ---------------- */
     return (
         <div className="min-h-screen bg-background">
@@ -202,7 +208,7 @@ export default function LaundryPricingManagement() {
                             </p>
                         </div>
 
-                        <div className="flex gap-2">
+                        {permission?.can_create && <div className="flex gap-2">
                             <Button
                                 variant="heroOutline"
                                 onClick={() => setSheetOpen(true)}
@@ -234,7 +240,7 @@ export default function LaundryPricingManagement() {
                                     </Button>
                                 </>
                             )}
-                        </div>
+                        </div>}
                     </div>
                     {(isSuperAdmin || isOwner) && <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
 

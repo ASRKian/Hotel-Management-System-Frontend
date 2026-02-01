@@ -27,6 +27,8 @@ import { toast } from "react-toastify";
 import AppHeader from "@/components/layout/AppHeader";
 import { selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 import { normalizeTextInput } from "@/utils/normalizeTextInput";
+import { usePermission } from "@/rbac/usePermission";
+import { useLocation } from "react-router-dom";
 
 const PERMISSION_ACTIONS = [
     { key: "read", label: "read", field: "can_read" },
@@ -46,6 +48,63 @@ type SidebarPermissionPayload = {
     };
 };
 
+function buildPermissionState(action: "deny" | "read" | "write" | "delete") {
+    if (action === "deny") {
+        return {
+            can_read: false,
+            can_create: false,
+            can_update: false,
+            can_delete: false,
+        };
+    }
+
+    if (action === "read") {
+        return {
+            can_read: true,
+            can_create: false,
+            can_update: false,
+            can_delete: false,
+        };
+    }
+
+    if (action === "write") {
+        return {
+            can_read: true,
+            can_create: true,
+            can_update: true,
+            can_delete: false,
+        };
+    }
+
+    if (action === "delete") {
+        return {
+            can_read: true,
+            can_create: true,
+            can_update: true,
+            can_delete: true,
+        };
+    }
+
+    return {
+        can_read: false,
+        can_create: false,
+        can_update: false,
+        can_delete: false,
+    };
+}
+
+function getPermissionLabel(action: any) {
+    switch (action) {
+        case "read":
+            return "Viewer";
+        case "write":
+            return "Editor";
+        case "delete":
+            return "Administrator";
+        default:
+            return action;
+    }
+}
 
 export default function RoleManagement() {
     const [newRoleName, setNewRoleName] = useState("");
@@ -171,19 +230,17 @@ export default function RoleManagement() {
         );
     }
 
-    function onPermissionChange(
+    function onPermissionRadioChange(
         moduleId: number,
-        field: "can_read" | "can_create" | "can_update" | "can_delete",
-        checked: boolean
+        action: "deny" | "read" | "write" | "delete"
     ) {
+        const perms = buildPermissionState(action);
+
         setSidebarPermissionPayload(prev => ({
             ...prev,
             permissions: {
                 ...prev.permissions,
-                [moduleId]: {
-                    ...prev.permissions[moduleId],
-                    [field]: checked
-                }
+                [moduleId]: perms
             }
         }));
     }
@@ -245,6 +302,9 @@ export default function RoleManagement() {
         }));
     }
 
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+
     return (
         <div className="min-h-screen bg-background">
 
@@ -272,11 +332,11 @@ export default function RoleManagement() {
                             </div>
 
                             <Dialog open={isCreateRoleOpen} onOpenChange={setIsCreateRoleOpen}>
-                                <DialogTrigger asChild>
+                                {permission?.can_create && <DialogTrigger asChild>
                                     <Button variant="hero">
                                         <Plus className="h-4 w-4 mr-2" /> Add Role
                                     </Button>
-                                </DialogTrigger>
+                                </DialogTrigger>}
                                 <DialogContent>
                                     <DialogHeader>
                                         <DialogTitle>Create New Role</DialogTitle>
@@ -389,23 +449,23 @@ export default function RoleManagement() {
                                     </h2>
 
                                     <div className="flex gap-2">
-                                        <Button
+                                        {permission?.can_create && <Button
                                             size="sm"
                                             variant="ghost"
                                             disabled={!isDirty}
                                             onClick={resetPermissions}
                                         >
                                             Reset
-                                        </Button>
+                                        </Button>}
 
-                                        <Button
+                                        {permission?.can_create && <Button
                                             size="sm"
                                             variant="ghost"
-                                            disabled={!isSuperAdmin || !isDirty}
+                                            disabled={!isDirty}
                                             onClick={sidebarPermissionUpdate}
                                         >
                                             Update
-                                        </Button>
+                                        </Button>}
                                     </div>
                                 </div>
 
@@ -422,37 +482,39 @@ export default function RoleManagement() {
                                                 </span>
 
                                                 <div className="flex items-center gap-6">
-                                                    {["read", "write", "delete"].map((action) => {
-                                                        const permission = PERMISSION_ACTIONS.find(
-                                                            (p) => p.label === action
-                                                        );
+                                                    {["deny", "read", "write", "delete"].map((action) => {
+                                                        const perms = sidebarPermissionPayload.permissions[module.id] || { can_delete: false, can_update: false, can_create: false, can_read: false };
 
-                                                        if (!permission) return null;
+                                                        let selected: "deny" | "read" | "write" | "delete" | null = null;
+
+                                                        if (!perms.can_read && !perms.can_create && !perms.can_update && !perms.can_delete) {
+                                                            selected = "deny";
+                                                        }
+                                                        else if (perms.can_delete) selected = "delete";
+                                                        else if (perms.can_update && perms.can_create) selected = "write";
+                                                        else if (perms.can_read) selected = "read";
 
                                                         return (
-                                                            <div
+                                                            <label
                                                                 key={action}
-                                                                className="flex items-center gap-2"
+                                                                className="flex items-center gap-2 cursor-pointer"
                                                             >
-                                                                <Checkbox
-                                                                    checked={isChecked(
-                                                                        module.id,
-                                                                        permission.field
-                                                                    )}
-                                                                    onCheckedChange={(checked) =>
-                                                                        onPermissionChange(
-                                                                            module.id,
-                                                                            permission.field,
-                                                                            Boolean(checked)
-                                                                        )
+                                                                <input
+                                                                    type="radio"
+                                                                    name={`perm-${module.id}`}
+                                                                    checked={selected === action}
+                                                                    onChange={() => permission?.can_create &&
+                                                                        onPermissionRadioChange(module.id, action as any)
                                                                     }
                                                                 />
-                                                                <Label className="text-sm capitalize">
-                                                                    {action}
-                                                                </Label>
-                                                            </div>
+                                                                <span className="text-sm capitalize">
+                                                                    {getPermissionLabel(action)}
+                                                                </span>
+
+                                                            </label>
                                                         );
                                                     })}
+
                                                 </div>
                                             </div>
                                         ))}

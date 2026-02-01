@@ -31,6 +31,8 @@ import {
 } from "@/redux/selectors/auth.selectors";
 import { toast } from "react-toastify";
 import { normalizeTextInput } from "@/utils/normalizeTextInput";
+import { useLocation } from "react-router-dom";
+import { usePermission } from "@/rbac/usePermission";
 
 /* ---------------- Types ---------------- */
 type Vendor = {
@@ -138,6 +140,10 @@ export default function VendorsManagement() {
         setSheetOpen(false);
     };
 
+
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+
     /* ---------------- UI ---------------- */
     return (
         <div className="min-h-screen bg-background">
@@ -155,9 +161,9 @@ export default function VendorsManagement() {
                             </p>
                         </div>
 
-                        <Button variant="hero" onClick={openAdd}>
+                        {permission?.can_create && <Button variant="hero" onClick={openAdd}>
                             Add Vendor
-                        </Button>
+                        </Button>}
                     </div>
 
                     {/* Filters */}
@@ -400,11 +406,11 @@ export default function VendorsManagement() {
                             >
                                 Cancel
                             </Button>
-                            <Button variant="hero" onClick={handleSave}>
+                            {permission?.can_create && <Button variant="hero" onClick={handleSave}>
                                 {mode === "add"
                                     ? "Create Vendor"
                                     : "Save Changes"}
-                            </Button>
+                            </Button>}
                         </div>
                     </div>
                 </SheetContent>

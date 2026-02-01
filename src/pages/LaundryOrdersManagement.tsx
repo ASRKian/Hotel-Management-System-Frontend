@@ -31,6 +31,8 @@ import { CalendarIcon } from "lucide-react";
 import DatePicker from 'react-datepicker'
 import { toast } from "react-toastify";
 import { normalizeNumberInput } from "@/utils/normalizeTextInput";
+import { useLocation } from "react-router-dom";
+import { usePermission } from "@/rbac/usePermission";
 
 /* ---------------- Types ---------------- */
 export type LaundryStatus =
@@ -224,6 +226,10 @@ export default function LaundryOrdersManagement() {
         }
     };
 
+
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+
     /* ---------------- UI ---------------- */
     return (
         <div className="min-h-screen bg-background">
@@ -241,9 +247,9 @@ export default function LaundryOrdersManagement() {
                             </p>
                         </div>
 
-                        <Button variant="hero" onClick={() => setSheetOpen(true)}>
+                        {permission?.can_create && <Button variant="hero" onClick={() => setSheetOpen(true)}>
                             Create Order
-                        </Button>
+                        </Button>}
                     </div>
 
                     {(isOwner || isSuperAdmin) && <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -306,7 +312,7 @@ export default function LaundryOrdersManagement() {
                                             order.laundry_status === "CANCELLED"
                                         }
                                         onChange={(e) => {
-                                            if (e.target.value !== order.laundry_status) {
+                                            if (e.target.value !== order.laundry_status && permission?.can_create) {
                                                 setStatusModal({
                                                     open: true,
                                                     orderId: order.id,

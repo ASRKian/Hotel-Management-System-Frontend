@@ -26,9 +26,10 @@ import { toast } from "react-toastify";
 import { useAppSelector } from "@/redux/hook";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 import { normalizeNumberInput, normalizeTextInput } from "@/utils/normalizeTextInput";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import AppHeader from "@/components/layout/AppHeader";
 import { isWithinCharLimit } from "@/utils/isWithinCharLimit";
+import { usePermission } from "@/rbac/usePermission";
 
 // ---- Types ----
 type Property = {
@@ -885,6 +886,8 @@ export default function PropertyManagement() {
         }
     }, [sheetOpen]);
 
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
 
     return (
         <div className="min-h-screen bg-background">
@@ -906,20 +909,18 @@ export default function PropertyManagement() {
                             </p>
                         </div>
 
-                        <Button
+                        {permission?.can_create && <Button
                             variant="hero"
+                            disabled={!permission?.can_create}
                             onClick={() => {
                                 setMode("add");
-                                // setLogoFile(null);
-                                // setLogoPreview(null);
-
                                 setSelectedProperty(null);
                                 setNewProperty(EMPTY_PROPERTY);
                                 setSheetOpen(true);
                             }}
                         >
                             Add Property
-                        </Button>
+                        </Button>}
 
                     </div>
 
@@ -1837,20 +1838,20 @@ export default function PropertyManagement() {
                                 Reset
                             </Button> */}
 
-                            <Button
+                            {permission?.can_create && <Button
                                 variant="hero"
                                 onClick={handleSubmitProperty}
-                                disabled={mode === "edit" && !isDirty}
+                                disabled={!permission?.can_create || mode === "edit" && !isDirty}
                             >
                                 {mode === "add" ? "Create Property" : "Save Changes"}
-                            </Button>
+                            </Button>}
 
                         </div>
                     </motion.div>
                 </SheetContent>
             </Sheet>
 
-        </div>
+        </div >
     );
 }
 

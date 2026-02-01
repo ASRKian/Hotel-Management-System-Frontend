@@ -15,6 +15,8 @@ import { useAppSelector } from "@/redux/hook";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 import { normalizeNumberInput } from "@/utils/normalizeTextInput";
 import { toast } from "react-toastify";
+import { useLocation } from "react-router-dom";
+import { usePermission } from "@/rbac/usePermission";
 
 const TABLE_STATUSES = ["Available", "Occupied", "Reserved", "Out of Service"];
 
@@ -140,6 +142,9 @@ export function RestaurantTables() {
         })
     };
 
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+
     return (
         <div className="h-screen bg-background overflow-hidden">
             <AppHeader />
@@ -177,9 +182,9 @@ export function RestaurantTables() {
                                 </select>
                             </div>
                         )}
-                        <Button variant="hero" onClick={() => setOpen(true)}>
-                            + Add Table
-                        </Button>
+                        {permission?.can_create && <Button variant="hero" onClick={() => setOpen(true)}>
+                            Add Table
+                        </Button>}
                     </div>
 
                     {/* Table List */}
@@ -207,7 +212,7 @@ export function RestaurantTables() {
                                         className="h-9 rounded-lg border px-2 text-sm"
                                         value={table.status}
                                         onChange={(e) =>
-                                            updateTableStatus(table.id, e.target.value)
+                                            permission?.can_create && updateTableStatus(table.id, e.target.value)
                                         }
                                     >
                                         {TABLE_STATUSES.map((s) => (
@@ -215,14 +220,14 @@ export function RestaurantTables() {
                                         ))}
                                     </select>
 
-                                    <span
+                                    {/* <span
                                         className={`text-xs font-medium px-2 py-1 rounded-lg ${table.is_active
                                             ? "bg-green-100 text-green-700"
                                             : "bg-red-100 text-red-700"
                                             }`}
                                     >
                                         {table.is_active ? "Active" : "Inactive"}
-                                    </span>
+                                    </span> */}
                                 </div>
                             </div>
                         ))}

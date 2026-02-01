@@ -20,6 +20,8 @@ import { useAppSelector } from "@/redux/hook";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 import { useCreateInventoryMutation, useGetKitchenInventoryQuery, useGetMyPropertiesQuery, useUpdateInventoryMutation } from "@/redux/services/hmsApi";
 import { toast } from "react-toastify";
+import { useLocation } from "react-router-dom";
+import { usePermission } from "@/rbac/usePermission";
 
 type KitchenItem = {
     id: string;
@@ -42,7 +44,7 @@ type Pagination = {
 
 // CREATE
 function buildCreateKitchenItemPayload(data: {
-    property_id: number;
+    property_id: string;
     item_name: string;
     category: string;
     stock_qty: number;
@@ -50,9 +52,9 @@ function buildCreateKitchenItemPayload(data: {
     reorder_level: number;
     cost_price: number;
     is_active: boolean;
-}) {
+}, propertyId) {
     return {
-        property_id: data.property_id,
+        property_id: propertyId,
         item_name: data.item_name,
         category: data.category,
         stock_qty: data.stock_qty,
@@ -100,7 +102,7 @@ export default function KitchenInventory() {
     });
 
     const [createForm, setCreateForm] = useState({
-        property_id: 5,
+        property_id: "",
         item_name: "",
         category: "",
         stock_qty: 0,
@@ -151,7 +153,7 @@ export default function KitchenInventory() {
     };
 
     const createItem = () => {
-        const payload = buildCreateKitchenItemPayload(createForm);
+        const payload = buildCreateKitchenItemPayload(createForm, selectedPropertyId);
         const promise = createInventory(payload).unwrap()
         toast.promise(promise, {
             error: "Error creating inventory item",
@@ -161,6 +163,8 @@ export default function KitchenInventory() {
         setCreateOpen(false);
     };
 
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
     /* ---------------- UI ---------------- */
 
     return (
@@ -203,9 +207,9 @@ export default function KitchenInventory() {
                                 </select>
                             </div>
                         )}
-                        <Button variant="hero" onClick={() => setCreateOpen(true)}>
-                            + Add Item
-                        </Button>
+                        {permission?.can_create && <Button variant="hero" onClick={() => setCreateOpen(true)}>
+                            Add Item
+                        </Button>}
                     </div>
 
                     {/* Inventory List */}
@@ -338,7 +342,7 @@ export default function KitchenInventory() {
                                                     variant="heroOutline"
                                                     onClick={() => openManage(item)}
                                                 >
-                                                    Manage
+                                                    View
                                                 </Button>
                                             </td>
                                         </tr>
@@ -401,9 +405,9 @@ export default function KitchenInventory() {
                                         <Info label="Status" value={selectedItem.is_active ? "Active" : "Inactive"} />
                                     </div>
 
-                                    <Button variant="hero" onClick={() => setIsEditing(true)}>
+                                    {permission?.can_create && <Button variant="hero" onClick={() => setIsEditing(true)}>
                                         Edit Item
-                                    </Button>
+                                    </Button>}
                                 </>
                             ) : (
                                 <>

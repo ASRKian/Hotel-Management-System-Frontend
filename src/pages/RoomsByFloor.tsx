@@ -18,6 +18,7 @@ import { Plus } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 import { Label } from "@/components/ui/label";
+import { usePermission } from "@/rbac/usePermission";
 
 /* -------------------- Types -------------------- */
 type Room = {
@@ -218,6 +219,10 @@ export default function RoomsByFloor() {
         return roomDrafts[room.id]?.[key] ?? "";
     };
 
+
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+
     return (
         <div className="min-h-screen bg-background">
             <AppHeader
@@ -240,7 +245,7 @@ export default function RoomsByFloor() {
                             </p>
                         </div>
 
-                        <Button
+                        {permission?.can_create && <Button
                             variant="outline"
                             onClick={() => {
                                 const existingFloors = roomsByFloor.map(f => f.floor);
@@ -257,7 +262,7 @@ export default function RoomsByFloor() {
                             }}
                         >
                             + Add Floor
-                        </Button>
+                        </Button>}
 
                     </div>
 
@@ -455,7 +460,7 @@ export default function RoomsByFloor() {
                                     ))}
 
                                     {/* Add Room Card */}
-                                    <div
+                                    {permission?.can_create && <div
                                         onClick={() => {
                                             setSelectedFloor(floor);
                                             setRoomType("STANDARD");
@@ -463,7 +468,7 @@ export default function RoomsByFloor() {
                                         }}
                                         className="aspect-square rounded-[3px] border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted transition">
                                         <Plus className="h-8 w-8 text-muted-foreground" />
-                                    </div>
+                                    </div>}
 
                                 </div>
                             </div>
@@ -485,13 +490,13 @@ export default function RoomsByFloor() {
                             : "No changes made"}
                     </span>
 
-                    <Button
+                    {permission?.can_create && <Button
                         variant="hero"
                         disabled={getChangedRooms()?.length === 0}
                         onClick={handleBulkUpdate}
                     >
                         Update Rooms
-                    </Button>
+                    </Button>}
                 </div>
 
 

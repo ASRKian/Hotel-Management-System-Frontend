@@ -15,6 +15,8 @@ import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.select
 import { useGetMyPropertiesQuery, useGetRoomTypesQuery, useUpdateRoomTypesMutation } from "@/redux/services/hmsApi";
 import { toast } from "react-toastify";
 import { normalizeNumberInput } from "@/utils/normalizeTextInput";
+import { useLocation } from "react-router-dom";
+import { usePermission } from "@/rbac/usePermission";
 
 /* ---------------- Types ---------------- */
 type RateRow = {
@@ -106,6 +108,10 @@ export default function RoomTypeBasePriceManagement() {
         setEditMode(false);
     }
 
+
+    const pathname = useLocation().pathname
+    const { permission } = usePermission(pathname)
+
     /* ---------- UI ---------- */
     return (
         <div className="min-h-screen bg-background">
@@ -118,14 +124,14 @@ export default function RoomTypeBasePriceManagement() {
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold">
-                                Room Category Base Prices
+                                Room Category
                             </h1>
                             <p className="text-sm text-muted-foreground">
                                 Manage base pricing per room configuration
                             </p>
                         </div>
 
-                        {!editMode ? (
+                        {permission?.can_create ? !editMode ? (
                             <Button
                                 variant="hero"
                                 onClick={() => setEditMode(true)}
@@ -153,7 +159,7 @@ export default function RoomTypeBasePriceManagement() {
                                     Update
                                 </Button>
                             </div>
-                        )}
+                        ) : ""}
                     </div>
 
                     {(isSuperAdmin || isOwner) && <div className="mb-4 max-w-sm space-y-2">
