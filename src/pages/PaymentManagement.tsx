@@ -25,8 +25,14 @@ import {
 import { useAppSelector } from "@/redux/hook";
 
 /* ---------------- Helpers ---------------- */
-const formatDate = (date?: string) =>
-    date ? new Date(date).toLocaleString() : "—";
+const formatDate = (date: Date | null) => {
+    if (!date) return "";
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;   // local timezone safe
+};
+
 
 /* ---------------- Component ---------------- */
 export default function PaymentsManagement() {
@@ -81,7 +87,7 @@ export default function PaymentsManagement() {
                         <div>
                             <Label>Property</Label>
                             <select
-                                className="w-full h-10 rounded-xl border px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border px-3 text-sm"
                                 value={propertyId ?? ""}
                                 onChange={(e) => {
                                     setPage(1);
@@ -104,7 +110,7 @@ export default function PaymentsManagement() {
                         {/* <div>
                             <Label>Booking ID</Label>
                             <select
-                                className="w-full h-10 rounded-xl border px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border px-3 text-sm"
                                 value={propertyId ?? ""}
                                 onChange={(e) => {
                                     setPage(1);
@@ -127,7 +133,7 @@ export default function PaymentsManagement() {
                         <div>
                             <Label>Method</Label>
                             <select
-                                className="w-full h-10 rounded-xl border px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border px-3 text-sm"
                                 value={method}
                                 onChange={(e) => {
                                     setPage(1);
@@ -144,7 +150,7 @@ export default function PaymentsManagement() {
                         {/* <div>
                             <Label>Status</Label>
                             <select
-                                className="w-full h-10 rounded-xl border px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border px-3 text-sm"
                                 value={status}
                                 onChange={(e) => {
                                     setPage(1);
@@ -174,7 +180,7 @@ export default function PaymentsManagement() {
                     </div>
 
                     {/* Table */}
-                    <div className="bg-card border rounded-2xl overflow-hidden">
+                    <div className="bg-card border rounded-[5px] overflow-hidden">
                         <Table>
                             <TableHeader>
                                 <TableRow>

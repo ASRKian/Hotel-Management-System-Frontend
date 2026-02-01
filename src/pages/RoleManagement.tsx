@@ -293,7 +293,7 @@ export default function RoleManagement() {
                                         <div className="space-y-3">
                                             <Label className="text-sm">Permissions</Label>
 
-                                            <div className="space-y-2 max-h-60 overflow-y-auto border rounded-xl p-3">
+                                            <div className="space-y-2 max-h-60 overflow-y-auto border rounded-[3px] p-3">
                                                 {allSidebarLinksData?.roles.map((module) => (
                                                     <div
                                                         key={module.id}
@@ -340,7 +340,7 @@ export default function RoleManagement() {
                             </Dialog>
                         </div>
 
-                        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+                        <div className="bg-card rounded-[5px] border border-border shadow-sm overflow-hidden">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -381,7 +381,7 @@ export default function RoleManagement() {
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="bg-card rounded-2xl border border-border shadow-sm p-6"
+                                className="bg-card rounded-[5px] border border-border shadow-sm p-6"
                             >
                                 <div className="flex items-center justify-between mb-4">
                                     <h2 className="text-lg font-semibold text-foreground">
@@ -415,7 +415,7 @@ export default function RoleManagement() {
                                         allSidebarLinksData.roles.map((module) => (
                                             <div
                                                 key={module.id}
-                                                className="flex items-center justify-between border border-border rounded-xl p-4"
+                                                className="flex items-center justify-between border border-border rounded-[3px] p-4"
                                             >
                                                 <span className="font-medium text-foreground">
                                                     {module.link_name}

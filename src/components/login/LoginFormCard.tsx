@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ import { Eye, EyeOff, Mail, ShieldCheck, Zap } from "lucide-react";
 import { supabase } from "../../../supabase/functions/supabase-client.ts";
 import { useDispatch } from "react-redux";
 import { loginSuccess } from "@/redux/slices/isLoggedInSlice.ts";
+import { useGetSidebarLinksQuery } from "@/redux/services/hmsApi.ts";
+import { useAppSelector } from "@/redux/hook.ts";
 
 const SUPPORT_EMAIL = "support@atithiflow.com";
 
@@ -32,6 +34,11 @@ const LoginFormCard = () => {
 
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
+
+  const { data: sidebarLinks } = useGetSidebarLinksQuery(undefined, {
+    skip: !isLoggedIn
+  })
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -58,20 +65,23 @@ const LoginFormCard = () => {
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
       const { data, error } = await login()
-      console.log("🚀 ~ handleSubmit ~ data:", data)
       setIsLoading(false);
       if (error) {
         setSubmitMessage(error.message);
         return;
       }
       const authToken = data.session.access_token
-      console.log("🚀 ~ handleSubmit ~ authToken:", authToken)
       localStorage.setItem("access_token", authToken)
       setSubmitMessage("Logged in success")
       dispatch(loginSuccess())
-      navigate("/properties")
     }
   };
+
+  useEffect(() => {
+    if (!isLoggedIn || !sidebarLinks || !Array.isArray(sidebarLinks.sidebarLinks)) return
+    const redirectPath = sidebarLinks?.sidebarLinks?.[0]?.endpoint
+    navigate(redirectPath)
+  }, [isLoggedIn, sidebarLinks])
 
   async function login() {
     return await supabase.auth.signInWithPassword({ email, password });
@@ -87,7 +97,7 @@ const LoginFormCard = () => {
         className="w-full max-w-md"
       >
         {/* Login Card */}
-        <div className="bg-card rounded-2xl border border-border shadow-lg p-6 sm:p-8">
+        <div className="bg-card rounded-[5px] border border-border shadow-lg p-6 sm:p-8">
           {/* Loading indicator */}
           {isLoading && (
             <div className="absolute top-0 left-0 right-0 h-1 bg-primary/20 rounded-t-2xl overflow-hidden">
@@ -116,7 +126,7 @@ const LoginFormCard = () => {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-6 p-4 bg-muted rounded-xl border border-border"
+              className="mb-6 p-4 bg-muted rounded-[3px] border border-border"
             >
               <p className="text-sm text-muted-foreground text-center" role="status" aria-live="polite">
                 {submitMessage}
@@ -230,7 +240,7 @@ const LoginFormCard = () => {
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full h-11 rounded-xl text-base font-medium"
+              className="w-full h-11 rounded-[3px] text-base font-medium"
               variant="hero"
               disabled={isLoading}
             >

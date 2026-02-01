@@ -15,10 +15,13 @@ type Room = {
     room_no: string;
     floor_number: number;
     dirty: boolean;
-    booking_status: "CHECKED_IN" | null;
+    booking_status: "CHECKED_IN" | "BOOKED" | "CHECKED_OUT" | null;
     pickup: boolean | null;
     drop: boolean | null;
-    status: "CHECKED_IN" | "FREE" | "CONFIRMED";
+    status: "CHECKED_IN" | "FREE" | "DIRTY" | "BOOKED";
+    room_category_name: string;
+    bed_type_name: string;
+    ac_type_name: string;
 };
 
 type Summary = {
@@ -46,38 +49,40 @@ type ApiResponse = {
 };
 
 const ROOM_STATUS_LEGEND = [
-    { label: "Occupied", color: "bg-red-300" },
+    { label: "Occupied", color: "bg-pink-300" },
     { label: "Free", color: "bg-green-300" },
-    { label: "Dirty", color: "bg-yellow-300" },
-    { label: "Booked", color: "bg-gray-300" },
-    { label: "Under Maintenance", color: "bg-blue-300" },
+    { label: "Dirty", color: "bg-gray-300" },
+    { label: "Adv. Booked", color: "bg-blue-300" },
+    { label: "Under Maintenance", color: "bg-yellow-300" },
 ];
 
 /* ---------------- Helpers ---------------- */
-function getRoomUiStatus(room: Room, data: ApiResponse): "OCCUPIED" | "FREE" | "DIRTY" | "BOOKED" {
-    if (room.status === "CONFIRMED" || room.status === "FREE") {
-        console.log("🚀 ~ getRoomUiStatus ~ room.status:", room.status)
-        const roomNo = room.room_no
-        const isBooked = data.checking_in.some(x => x.room_no === roomNo)
-        if (isBooked) return "BOOKED"
+function getRoomUiStatus(room: Room): "OCCUPIED" | "FREE" | "DIRTY" | "BOOKED" {
+    switch (room.status) {
+        case "CHECKED_IN":
+            return "OCCUPIED";
+        case "BOOKED":
+            return "BOOKED";
+        case "DIRTY":
+            return "DIRTY";
+        case "FREE":
+        default:
+            return "FREE";
     }
-    if (room.status === "CHECKED_IN") return "OCCUPIED";
-    if (room.dirty) return "DIRTY";
-    return "FREE";
 }
 
 function roomCardColor(status: "OCCUPIED" | "FREE" | "DIRTY" | "BOOKED" | "MAINTENANCE") {
     switch (status) {
         case "OCCUPIED":
-            return "bg-red-300 border-red-200";
+            return "bg-pink-300 border-pink-200";
         case "BOOKED":
-            return "bg-gray-300 border-gray-200";
+            return "bg-blue-300 border-blue-200";
         case "FREE":
             return "bg-green-300 border-green-200";
         case "DIRTY":
-            return "bg-yellow-300 border-yellow-200";
+            return "bg-gray-300 border-gray-200";
         case "MAINTENANCE":
-            return "bg-blue-300 border-blue-200";
+            return "bg-yellow-300 border-yellow-200";
         default:
             return "bg-card";
     }
@@ -103,38 +108,39 @@ export default function RoomStatusBoard() {
         skip: !isLoggedIn || !propertyId
     })
 
-    const checkedInRoomNos = new Set(
-        data?.rooms
-            .filter(room => room.booking_status === "CHECKED_IN")
-            .map(room => room.room_no)
-    );
-
-    const checkedOutRoomNos = new Set(
-        data?.rooms
-            .filter(room => room.booking_status === "CHECKED_OUT")
-            .map(room => room.room_no)
-    );
-
-    const filteredCheckIns = data?.checking_in.filter(
-        checkIn => !checkedInRoomNos.has(checkIn.room_no)
-    );
-    const filteredCheckOuts = data?.checking_out.filter(
-        out => !checkedOutRoomNos.has(out.room_no)
-    );
+    const filteredCheckIns = data?.checking_in || [];
+    const filteredCheckOuts = data?.checking_out || [];
 
     function getFloorName(floor: number): string {
-        if (floor === 0) return "Ground Floor";
+        if (floor === 0) return "G|F";
 
-        const mod10 = floor % 10;
-        const mod100 = floor % 100;
+        const romanMap: { value: number; symbol: string }[] = [
+            { value: 1000, symbol: "M" },
+            { value: 900, symbol: "CM" },
+            { value: 500, symbol: "D" },
+            { value: 400, symbol: "CD" },
+            { value: 100, symbol: "C" },
+            { value: 90, symbol: "XC" },
+            { value: 50, symbol: "L" },
+            { value: 40, symbol: "XL" },
+            { value: 10, symbol: "X" },
+            { value: 9, symbol: "IX" },
+            { value: 5, symbol: "V" },
+            { value: 4, symbol: "IV" },
+            { value: 1, symbol: "I" },
+        ];
 
-        let suffix = "th";
+        let num = floor;
+        let roman = "";
 
-        if (mod10 === 1 && mod100 !== 11) suffix = "st";
-        else if (mod10 === 2 && mod100 !== 12) suffix = "nd";
-        else if (mod10 === 3 && mod100 !== 13) suffix = "rd";
+        for (const { value, symbol } of romanMap) {
+            while (num >= value) {
+                roman += symbol;
+                num -= value;
+            }
+        }
 
-        return `${floor}${suffix} Floor`;
+        return `${roman}|F`;
     }
 
     // const filteredCheckOuts = data.checking_out.filter(out =>
@@ -180,7 +186,7 @@ export default function RoomStatusBoard() {
                                 </div>
 
                                 {/* Hover Panel */}
-                                <div className="absolute right-0 mt-2 w-44 rounded-xl border bg-card p-3 shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition">
+                                <div className="absolute right-0 mt-2 w-44 rounded-[3px] border bg-card p-3 shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition">
                                     <p className="text-xs font-medium mb-2 text-muted-foreground">
                                         Room Status
                                     </p>
@@ -206,7 +212,7 @@ export default function RoomStatusBoard() {
                             <Label>Properties</Label>
 
                             <select
-                                className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                 value={propertyId}
                                 onChange={(e) => setPropertyId(e.target.value)}
                             >
@@ -237,49 +243,37 @@ export default function RoomStatusBoard() {
 
                     {/* ---------- Summary ---------- */}
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-                        <SummaryCard
-                            label="Checked In"
-                            value={data?.summary.checked_in}
-                        />
-                        <SummaryCard
-                            label="Confirmed"
-                            value={data?.summary.confirmed}
-                        />
-                        <SummaryCard
-                            label="No Show"
-                            value={data?.summary.no_show}
-                        />
-                        <SummaryCard
-                            label="Free"
-                            value={data?.summary.free}
-                        />
-                        <SummaryCard
-                            label="Dirty"
-                            value={data?.summary.dirty}
-                        />
+                        <SummaryCard label="Checked In" value={data?.summary.checked_in} />
+                        <SummaryCard label="Booked" value={data?.summary.confirmed} />
+                        <SummaryCard label="No Show" value={data?.summary.no_show} />
+                        <SummaryCard label="Free" value={data?.summary.free} />
+                        <SummaryCard label="Dirty" value={data?.summary.dirty} />
                     </div>
 
                     {/* ---------- Main Layout ---------- */}
-                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_180px] gap-4">
                         {/* ---------- Rooms Grid ---------- */}
-                        <div className="bg-card border rounded-2xl p-6">
+                        <div className="bg-card border rounded-[5px] p-6">
                             <p className="font-semibold mb-4">Rooms</p>
 
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                                 {data?.rooms.map((room) => {
                                     const uiStatus =
-                                        getRoomUiStatus(room, data);
+                                        getRoomUiStatus(room);
 
                                     return (
                                         <div
                                             key={room.ref_room_id}
                                             className={cn(
-                                                "rounded-xl border p-3 space-y-2 transition",
+                                                "rounded-[3px] border p-3 space-y-2 transition",
                                                 roomCardColor(uiStatus)
                                             )}
                                         >
-                                            <div className="flex justify-between items-center">
-                                                <p className="font-semibold">
+                                            <p className="text-xs text-muted-foreground">
+                                                {getFloorName(room.floor_number)}
+                                            </p>
+                                            <div className="flex justify-center items-center">
+                                                <p className="text-2xl font-semibold">
                                                     {room.room_no}
                                                 </p>
                                                 {/* <span className="text-xs font-medium">
@@ -288,7 +282,7 @@ export default function RoomStatusBoard() {
                                             </div>
 
                                             <p className="text-xs text-muted-foreground">
-                                                {getFloorName(room.floor_number)}
+                                                {room?.bed_type_name?.split(" ")?.[0]}|{room?.room_category_name}
                                             </p>
                                         </div>
 
@@ -300,7 +294,7 @@ export default function RoomStatusBoard() {
                         {/* ---------- Right Panel ---------- */}
                         <div className="space-y-6">
                             {/* Checking Out */}
-                            <div className="bg-card border rounded-2xl p-5">
+                            <div className="bg-card border rounded-[5px] p-5">
                                 <p className="font-semibold mb-3">
                                     Checking Out
                                 </p>
@@ -315,7 +309,7 @@ export default function RoomStatusBoard() {
                             </div>
 
                             {/* Checking In */}
-                            <div className="bg-card border rounded-2xl p-5">
+                            <div className="bg-card border rounded-[5px] p-5">
                                 <p className="font-semibold mb-3">
                                     Checking In
                                 </p>
@@ -347,7 +341,7 @@ function SummaryCard({
     value: number;
 }) {
     return (
-        <div className="bg-card border rounded-xl p-4">
+        <div className="bg-card border rounded-[3px] p-4">
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="text-xl font-semibold">{value}</p>
         </div>

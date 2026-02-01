@@ -141,7 +141,7 @@ export default function VehiclesEmbedded({ bookingId, rooms }: Props) {
             {vehicles.map((v, index) => (
                 <div
                     key={index}
-                    className="rounded-2xl border bg-card p-6 space-y-4"
+                    className="rounded-[5px] border bg-card p-6 space-y-4"
                 >
                     <div className="flex justify-between items-center">
                         <p className="font-medium">Vehicle {index + 1}</p>
@@ -174,7 +174,7 @@ export default function VehiclesEmbedded({ bookingId, rooms }: Props) {
                             <div className="space-y-1">
                                 <Label>Vehicle Type</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border px-3 text-sm"
                                     value={v.vehicle_type}
                                     onChange={(e) =>
                                         updateVehicle(index, {
@@ -215,7 +215,7 @@ export default function VehiclesEmbedded({ bookingId, rooms }: Props) {
                             <div className="space-y-1">
                                 <Label>Room No</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={v.room_no ?? ""}
                                     onChange={(e) =>
                                         updateVehicle(index, {

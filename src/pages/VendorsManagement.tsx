@@ -166,7 +166,7 @@ export default function VendorsManagement() {
                             <div className="space-y-1">
                                 <Label>Property</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={selectedPropertyId}
                                     onChange={(e) => {
                                         setPage(1);
@@ -187,7 +187,7 @@ export default function VendorsManagement() {
                     )}
 
                     {/* Table */}
-                    <div className="bg-card border rounded-2xl overflow-hidden">
+                    <div className="bg-card border rounded-[5px] overflow-hidden">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -562,7 +562,7 @@ function buildVendorPayload(
 //                                 <Label>Properties</Label>
 
 //                                 <select
-//                                     className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+//                                     className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
 //                                     value={selectedPropertyId}
 //                                     onChange={(e) => setSelectedPropertyId(e.target.value)}
 //                                 >
@@ -586,7 +586,7 @@ function buildVendorPayload(
 //                         {!vendorsLoading && !vendorsUninitialized && vendors?.data?.map((vendor) => (
 //                             <div
 //                                 key={vendor.id}
-//                                 className="rounded-xl border bg-card p-4 flex items-center justify-between"
+//                                 className="rounded-[3px] border bg-card p-4 flex items-center justify-between"
 //                             >
 //                                 <div className="space-y-1">
 //                                     <p className="font-semibold">

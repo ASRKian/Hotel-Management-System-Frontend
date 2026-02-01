@@ -13,7 +13,7 @@ const PricingSection = () => {
   return (
     <section className="py-20 bg-muted">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto bg-card rounded-2xl border border-border p-8 md:p-12 shadow-sm hover:shadow-lg hover:border-primary/50 transition-all duration-300">
+        <div className="max-w-4xl mx-auto bg-card rounded-[5px] border border-border p-8 md:p-12 shadow-sm hover:shadow-lg hover:border-primary/50 transition-all duration-300">
           <div className="grid md:grid-cols-2 gap-8 items-center">
             <div>
               <h2 className="text-3xl font-bold text-foreground">
@@ -37,7 +37,7 @@ const PricingSection = () => {
               </ul>
             </div>
             <div className="text-center md:text-right">
-              <div className="inline-block bg-primary/10 rounded-2xl p-8 hover:bg-primary/15 hover:scale-[1.02] transition-all duration-300">
+              <div className="inline-block bg-primary/10 rounded-[5px] p-8 hover:bg-primary/15 hover:scale-[1.02] transition-all duration-300">
                 <p className="text-muted-foreground mb-2">Starting from</p>
                 <p className="text-4xl font-bold text-foreground">Custom</p>
                 <p className="text-muted-foreground mt-2">per property/month</p>

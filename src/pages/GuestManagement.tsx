@@ -247,7 +247,7 @@ export default function BookingGuestsManagement() {
                         return (
                             <div
                                 key={key}
-                                className="rounded-2xl border bg-card p-6 space-y-4"
+                                className="rounded-[5px] border bg-card p-6 space-y-4"
                             >
                                 <div className="flex justify-between">
                                     <p className="font-semibold">
@@ -355,7 +355,7 @@ export default function BookingGuestsManagement() {
                                 )}
 
                                 {index === 0 && (
-                                    <div className="mt-6 rounded-2xl border bg-muted/30 p-5 space-y-4">
+                                    <div className="mt-6 rounded-[5px] border bg-muted/30 p-5 space-y-4">
                                         <div className="flex items-center justify-between">
                                             <p className="font-semibold">Vehicle Details</p>
 
@@ -377,7 +377,7 @@ export default function BookingGuestsManagement() {
                                         {vehicles.map((v, vIndex) => (
                                             <div
                                                 key={vIndex}
-                                                className="rounded-xl border bg-card p-4 space-y-4"
+                                                className="rounded-[3px] border bg-card p-4 space-y-4"
                                             >
                                                 <div className="flex justify-between items-center">
                                                     <p className="font-medium">
@@ -398,7 +398,7 @@ export default function BookingGuestsManagement() {
                                                     <div>
                                                         <Label>Vehicle Type</Label>
                                                         <select
-                                                            className="w-full h-10 rounded-xl border px-3 text-sm"
+                                                            className="w-full h-10 rounded-[3px] border px-3 text-sm"
                                                             value={v.vehicle_type}
                                                             onChange={(e) =>
                                                                 updateVehicle(vIndex, {

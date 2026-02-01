@@ -219,7 +219,7 @@ export default function GuestsCreationManagement() {
                     </div>
 
                     {/* Shared Fields */}
-                    <div className="rounded-2xl border border-border bg-card p-4 space-y-4 mt-4">
+                    <div className="rounded-[5px] border border-border bg-card p-4 space-y-4 mt-4">
                         <p className="font-medium">Common Information</p>
 
                         <div className="space-y-1">
@@ -233,7 +233,7 @@ export default function GuestsCreationManagement() {
                         <div className="space-y-1">
                             <Label>Address</Label>
                             <textarea
-                                className="w-full min-h-[80px] rounded-xl border px-3 py-2 text-sm"
+                                className="w-full min-h-[80px] rounded-[3px] border px-3 py-2 text-sm"
                                 value={sharedAddress}
                                 onChange={(e) => setSharedAddress(normalizeTextInput(e.target.value))}
                             />
@@ -262,7 +262,7 @@ export default function GuestsCreationManagement() {
                     {guests.map((guest, index) => (
                         <div
                             key={index}
-                            className="rounded-2xl border border-border bg-card p-6 space-y-4 mt-4"
+                            className="rounded-[5px] border border-border bg-card p-6 space-y-4 mt-4"
                         >
                             <p className="font-semibold">Guest {index + 1}</p>
 
@@ -271,7 +271,7 @@ export default function GuestsCreationManagement() {
                                 <div className="space-y-1">
                                     <Label>Salutation</Label>
                                     <select
-                                        className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                        className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                         value={guest.salutation ?? ""}
                                         onChange={(e) =>
                                             updateGuest(index, {
@@ -355,7 +355,7 @@ export default function GuestsCreationManagement() {
                                 <div className="space-y-1">
                                     <Label>Gender</Label>
                                     <select
-                                        className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                        className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                         value={guest.gender ?? ""}
                                         onChange={(e) =>
                                             updateGuest(index, {
@@ -389,7 +389,7 @@ export default function GuestsCreationManagement() {
                                 <div className="space-y-1">
                                     <Label>ID Type</Label>
                                     <select
-                                        className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                        className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                         value={guest.id_type ?? ""}
                                         onChange={(e) =>
                                             updateGuest(index, {

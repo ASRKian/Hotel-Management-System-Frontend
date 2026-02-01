@@ -71,8 +71,6 @@ export default function PaymentsEmbedded({
     const [method, setMethod] = useState("Cash");
     const [type, setType] = useState("Advance");
     const [status, setStatus] = useState("Paid");
-    const [confirmOpen, setConfirmOpen] = useState(false);
-
 
     const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
 
@@ -126,7 +124,7 @@ export default function PaymentsEmbedded({
 
             {/* Empty */}
             {!paymentsLoading && payments?.data.length === 0 && (
-                <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                <div className="rounded-[3px] border border-dashed p-6 text-center text-sm text-muted-foreground">
                     No payments recorded
                 </div>
             )}
@@ -136,7 +134,7 @@ export default function PaymentsEmbedded({
                 {!paymentsLoading && payments?.data?.map((p) => (
                     <div
                         key={p.id}
-                        className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+                        className="rounded-[5px] border border-border bg-card p-5 shadow-sm"
                     >
                         <div className="flex items-center justify-between mb-3">
                             <div>
@@ -204,7 +202,7 @@ export default function PaymentsEmbedded({
                             <div className="space-y-1">
                                 <Label>Method</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border px-3 text-sm"
                                     value={method}
                                     onChange={(e) =>
                                         setMethod(e.target.value)
@@ -220,7 +218,7 @@ export default function PaymentsEmbedded({
                             <div className="space-y-1">
                                 <Label>Type</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border px-3 text-sm"
                                     value={type}
                                     onChange={(e) =>
                                         setType(e.target.value)
@@ -236,7 +234,7 @@ export default function PaymentsEmbedded({
                         <div className="space-y-1">
                             <Label>Status</Label>
                             <select
-                                className="w-full h-10 rounded-xl border px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border px-3 text-sm"
                                 value={status}
                                 onChange={(e) =>
                                     setStatus(e.target.value)
@@ -257,7 +255,7 @@ export default function PaymentsEmbedded({
                             </Button>
                             <Button
                                 variant="hero"
-                                onClick={() => setConfirmOpen(true)}
+                                onClick={handleCreatePayment}
                                 disabled={!amount || Number(amount) === 0}
                             >
                                 Add Payment

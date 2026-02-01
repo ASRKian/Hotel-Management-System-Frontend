@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 
 const HeroSection = () => {
   return (
-    <section className="relative overflow-hidden bg-background py-20 lg:py-28">
+    <section className="relative overflow-hidden bg-white py-20 lg:py-28">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Text Content */}
@@ -32,7 +32,7 @@ const HeroSection = () => {
 
           {/* Visual */}
           <div className="relative">
-            <div className="relative rounded-2xl overflow-hidden shadow-lg">
+            <div className="relative rounded-[5px] overflow-hidden shadow-lg">
               <img
                 src="https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80"
                 alt="Modern hotel lobby with elegant interior design"
@@ -41,7 +41,7 @@ const HeroSection = () => {
               <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-transparent" />
             </div>
             {/* Floating Dashboard Card */}
-            <div className="absolute -bottom-6 -left-6 bg-card p-4 rounded-xl shadow-lg border border-border hidden lg:block">
+            <div className="absolute -bottom-6 -left-6 bg-card p-4 rounded-[3px] shadow-lg border border-border hidden lg:block">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center">
                   <span className="text-secondary font-bold text-lg">98%</span>

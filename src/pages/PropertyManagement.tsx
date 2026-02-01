@@ -116,7 +116,7 @@ function FormSection({
     children: React.ReactNode;
 }) {
     return (
-        <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
+        <div className="space-y-4 rounded-[5px] border border-border bg-card p-5">
             <div>
                 <h3 className="text-base font-semibold text-foreground">
                     {title}
@@ -951,12 +951,12 @@ export default function PropertyManagement() {
                     </div>
 
 
-                    <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+                    <div className="bg-card rounded-[5px] border border-border shadow-sm overflow-hidden">
                         <Table>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Property</TableHead>
-                                    {/* <TableHead>Status</TableHead> */}
+                                    <TableHead>Address</TableHead>
                                     <TableHead className="text-right">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -984,9 +984,9 @@ export default function PropertyManagement() {
                                                 <Building2 className="h-4 w-4 text-primary" />
                                                 {property.brand_name}
                                             </div>
-                                            <p className="text-xs text-muted-foreground">
+                                            {/* <p className="text-xs text-muted-foreground">
                                                 {property.city}, {property.state}
-                                            </p>
+                                            </p> */}
                                         </TableCell>
                                         {/* <PropertyStatusCell
                                             isUpdating={updatingPropertyIds.has(property.id)}
@@ -994,6 +994,13 @@ export default function PropertyManagement() {
                                             property={property}
                                             toggleActive={toggleActive}
                                         /> */}
+                                        <TableCell className="font-medium">
+                                            <div className="flex items-center gap-2">
+                                                {property.city}, {property.state}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                            </p>
+                                        </TableCell>
                                         <TableCell className="text-right">
                                             <Button
                                                 size="sm"
@@ -1020,7 +1027,7 @@ export default function PropertyManagement() {
                                                     setSheetOpen(true);
                                                 }}
                                             >
-                                                Manage
+                                                View
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -1082,7 +1089,7 @@ export default function PropertyManagement() {
                         <div className="space-y-2">
                             <Label>Property Image</Label>
 
-                            <div className="relative rounded-xl border border-border overflow-hidden">
+                            <div className="relative rounded-[3px] border border-border overflow-hidden">
                                 {(imagePreview || (newProperty.id && !imageError)) ? (
                                     <img
                                         src={
@@ -1150,7 +1157,7 @@ export default function PropertyManagement() {
                         <div className="space-y-2">
                             <Label>Property Logo</Label>
 
-                            <div className="relative rounded-xl border border-border overflow-hidden">
+                            <div className="relative rounded-[3px] border border-border overflow-hidden">
                                 {(logoPreview || (newProperty.id && !logoError)) ? (
                                     <img
                                         src={
@@ -1203,7 +1210,7 @@ export default function PropertyManagement() {
                                 <Input
                                     value={newProperty.serial_suffix}
                                     onChange={(e) => {
-                                        if (!isWithinCharLimit(e.target.value, 7)) return
+                                        if (!isWithinCharLimit(e.target.value, 4)) return
                                         setNewProperty({ ...newProperty, serial_suffix: normalizeTextInput(e.target.value) })
                                     }}
                                 />
@@ -1212,7 +1219,7 @@ export default function PropertyManagement() {
                                 <Label>Room Serial*</Label>
                                 <select
                                     required
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={newProperty.serial_number}
                                     onChange={(e) =>
                                         setNewProperty({
@@ -1241,7 +1248,7 @@ export default function PropertyManagement() {
                             {(isSuperAdmin || isOwner) && <div className="space-y-2">
                                 <Label>Property {isSuperAdmin ? "Owner" : "Admin"}</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={newProperty.owner_user_id}
                                     onChange={(e) => setNewProperty({ ...newProperty, owner_user_id: normalizeTextInput(e.target.value) })}
                                 >
@@ -1259,7 +1266,7 @@ export default function PropertyManagement() {
                                 <Label>Property Status</Label>
                                 <select
                                     required
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={newProperty.status}
                                     onChange={(e) =>
                                         setNewProperty({
@@ -1573,7 +1580,7 @@ export default function PropertyManagement() {
                         {hasBankDetails && bankAccounts.map((bank, index) => (
                             <div
                                 key={index}
-                                className="grid grid-cols-1 sm:grid-cols-2 gap-4 border border-border rounded-xl p-4"
+                                className="grid grid-cols-1 sm:grid-cols-2 gap-4 border border-border rounded-[3px] p-4"
                             >
                                 <div>
                                     <Label>Account Holder Name</Label>
@@ -1677,7 +1684,7 @@ export default function PropertyManagement() {
                         <div className="space-y-3">
                             <Label>Floor Configuration</Label>
 
-                            <div className="rounded-xl border border-border overflow-hidden">
+                            <div className="rounded-[3px] border border-border overflow-hidden">
                                 {/* Table Header */}
                                 <div className="grid grid-cols-[1fr_1fr_auto] gap-4 px-4 py-3 text-sm font-medium text-muted-foreground bg-muted/30">
                                     <span>Floor</span>
@@ -1772,7 +1779,7 @@ export default function PropertyManagement() {
                         {/* <div className="space-y-2">
                             <Label>Smoking Policy</Label>
                             <textarea
-                                className="w-full min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                className="w-full min-h-[96px] rounded-[3px] border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                 value={newProperty.smoking_policy}
                                 onChange={(e) =>
                                     setNewProperty({ ...newProperty, smoking_policy: normalizeTextInput(e.target.value) })
@@ -1783,7 +1790,7 @@ export default function PropertyManagement() {
                         {/* <div className="space-y-2">
                             <Label>Cancellation Policy</Label>
                             <textarea
-                                className="w-full min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                className="w-full min-h-[96px] rounded-[3px] border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                 value={newProperty.cancellation_policy}
                                 onChange={(e) =>
                                     setNewProperty({ ...newProperty, cancellation_policy: normalizeTextInput(e.target.value) })

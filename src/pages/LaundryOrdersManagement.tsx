@@ -19,7 +19,18 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppSelector } from "@/redux/hook";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
-import { useCreateLaundryOrderMutation, useGetMyPropertiesQuery, useGetPropertyLaundryOrdersQuery, useUpdateLaundryOrderMutation } from "@/redux/services/hmsApi";
+import { useCreateLaundryOrderMutation, useGetAllPropertyVendorsQuery, useGetBookingByIdQuery, useGetMyPropertiesQuery, useGetPropertyLaundryOrdersQuery, useGetPropertyLaundryPricingQuery, useTodayInHouseBookingIdsQuery, useUpdateLaundryOrderMutation } from "@/redux/services/hmsApi";
+import { Calendar } from "@/components/ui/calendar";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import DatePicker from 'react-datepicker'
+import { toast } from "react-toastify";
+import { normalizeNumberInput } from "@/utils/normalizeTextInput";
 
 /* ---------------- Types ---------------- */
 export type LaundryStatus =
@@ -43,11 +54,11 @@ type LaundryOrder = {
 
 type CreateLaundryOrderForm = {
     laundryId: number | "";
-    bookingId?: number | null;
-    roomId?: number | null;
+    bookingId?: number | "";
+    roomId?: number | "";
     vendorId: number | "";
     itemCount: number | "";
-    pickupDate: string;
+    pickupDate: string | Date;
 };
 
 /* ---------------- Helpers ---------------- */
@@ -80,6 +91,14 @@ function buildLaundryStatusPayload(status: LaundryStatus) {
     };
 }
 
+function parseDate(value?: string | Date) {
+    return value ? new Date(value) : null;
+}
+
+function formatDate(date?: Date | null) {
+    return date ? date.toISOString() : "";
+}
+
 /* ---------------- Component ---------------- */
 export default function LaundryOrdersManagement() {
     const [orders, setOrders] = useState<LaundryOrder[]>([]);
@@ -95,7 +114,7 @@ export default function LaundryOrdersManagement() {
         laundryId: "",
         vendorId: "",
         itemCount: "",
-        pickupDate: "",
+        pickupDate: new Date(),
     });
     const [selectedPropertyId, setSelectedPropertyId] = useState("");
     const [page, setPage] = useState(1);
@@ -110,6 +129,22 @@ export default function LaundryOrdersManagement() {
 
     const { data } = useGetPropertyLaundryOrdersQuery({ propertyId: selectedPropertyId, page }, {
         skip: !isLoggedIn || !selectedPropertyId
+    })
+
+    const { data: laundryTypes } = useGetPropertyLaundryPricingQuery({ propertyId: selectedPropertyId }, {
+        skip: !isLoggedIn || !selectedPropertyId
+    })
+
+    const { data: vendors } = useGetAllPropertyVendorsQuery({ propertyId: selectedPropertyId }, {
+        skip: !isLoggedIn || !selectedPropertyId
+    })
+
+    const { data: bookingIds } = useTodayInHouseBookingIdsQuery({ propertyId: selectedPropertyId }, {
+        skip: !isLoggedIn || !selectedPropertyId
+    })
+
+    const { data: bookingData } = useGetBookingByIdQuery(form.bookingId, {
+        skip: !isLoggedIn || !form.bookingId
     })
 
     const [createLaundryOrder] = useCreateLaundryOrderMutation()
@@ -135,6 +170,7 @@ export default function LaundryOrdersManagement() {
 
     /* ---------------- Validation ---------------- */
     const isCreateDisabled = useMemo(() => {
+        console.log("🚀 ~ LaundryOrdersManagement ~ form:", form)
         if (!form.laundryId || !form.vendorId || !form.itemCount || !form.pickupDate)
             return true;
 
@@ -153,7 +189,13 @@ export default function LaundryOrdersManagement() {
         );
 
         try {
-            await createLaundryOrder(payload).unwrap();
+            const promise = createLaundryOrder(payload).unwrap();
+
+            toast.promise(promise, {
+                error: "Error creating order",
+                pending: "Creating order, please wait",
+                success: "Order created successfully"
+            })
 
             setSheetOpen(false);
             setForm({
@@ -208,7 +250,7 @@ export default function LaundryOrdersManagement() {
                         <div className="space-y-2">
                             <Label>Property</Label>
                             <select
-                                className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                 value={selectedPropertyId}
                                 onChange={(e) => setSelectedPropertyId(e.target.value)}
                             >
@@ -232,7 +274,7 @@ export default function LaundryOrdersManagement() {
                         {orders.map((order) => (
                             <div
                                 key={order.id}
-                                className="rounded-xl border bg-card p-4 flex justify-between"
+                                className="rounded-[3px] border bg-card p-4 flex justify-between"
                             >
                                 <div className="space-y-1">
                                     <p className="font-semibold">
@@ -325,73 +367,184 @@ export default function LaundryOrdersManagement() {
 
             {/* Create Order Sheet */}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                <SheetContent side="right" className="w-full sm:max-w-md">
+                <SheetContent side="right" className="w-full sm:max-w-md h-full overflow-y-auto">
                     <SheetHeader>
                         <SheetTitle>Create Laundry Order</SheetTitle>
                     </SheetHeader>
 
                     <div className="space-y-4 mt-6">
-                        <Input
-                            placeholder="Laundry Item ID"
-                            type="number"
-                            value={form.laundryId}
-                            onChange={(e) =>
-                                setForm({ ...form, laundryId: Number(e.target.value) })
-                            }
-                        />
+                        {/* Laundry Item */}
+                        <div className="space-y-1">
+                            <Label>Laundry Item*</Label>
 
-                        <Input
-                            placeholder="Vendor ID"
-                            type="number"
-                            value={form.vendorId}
-                            onChange={(e) =>
-                                setForm({ ...form, vendorId: Number(e.target.value) })
-                            }
-                        />
 
-                        <Input
-                            placeholder="Booking ID (optional)"
-                            type="number"
-                            onChange={(e) =>
-                                setForm({
+                            <select
+                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
+                                value={form.laundryId}
+                                onChange={(e) => setForm({
+                                    ...form,
+                                    laundryId: Number(e.target.value),
+                                })}
+                            >
+                                {laundryTypes &&
+                                    laundryTypes?.data?.map((laundry) => (
+                                        <option key={laundry.id} value={laundry.id}>
+                                            {laundry.item_name}
+                                        </option>
+                                    ))}
+                            </select>
+                        </div>
+
+                        {/* Vendor */}
+                        <div className="space-y-1">
+                            <Label>Vendor*</Label>
+                            <select
+                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
+                                value={form.vendorId}
+                                onChange={(e) => setForm({
+                                    ...form,
+                                    vendorId: Number(e.target.value),
+                                })}
+                            >
+                                <option value={""} disabled>Select vendor</option>
+                                {vendors &&
+                                    vendors?.map((vendor) => (
+                                        <option key={vendor.id} value={vendor.id}>
+                                            {vendor.name} - {vendor.email_id} - {vendor.vendor_type}
+                                        </option>
+                                    ))}
+                            </select>
+                        </div>
+
+                        {/* Booking */}
+                        <div className="space-y-1">
+                            <Label>Booking ID</Label>
+
+                            <select
+                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
+                                value={form.bookingId}
+                                onChange={(e) => setForm({
                                     ...form,
                                     bookingId: e.target.value
                                         ? Number(e.target.value)
                                         : null,
-                                })
-                            }
-                        />
+                                    roomId: ""
+                                })}
+                            >
+                                <option value={""}>No Booking Id (Hotel Laundry)</option>
+                                {bookingIds &&
+                                    bookingIds?.map((bookingId) => (
+                                        <option key={bookingId} value={bookingId}>
+                                            #{bookingId}
+                                        </option>
+                                    ))}
+                            </select>
+                        </div>
 
+                        {/* Room (only if booking exists) */}
                         {form.bookingId && (
+                            <div className="space-y-1">
+                                <Label>Room ID*</Label>
+                                <select
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
+                                    value={form.roomId}
+                                    onChange={(e) => setForm({
+                                        ...form,
+                                        roomId: Number(e.target.value),
+                                    })}
+                                >
+                                    <option value={""} disabled>Select Room no</option>
+                                    {bookingData &&
+                                        bookingData?.booking?.rooms?.map((room) => (
+                                            <option key={room.room_no} value={room.room_no}>
+                                                {room.room_no}
+                                            </option>
+                                        ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Item Count */}
+                        <div className="space-y-1">
+                            <Label>Item Count *</Label>
                             <Input
-                                placeholder="Room ID *"
-                                type="number"
+                                type="text"
+                                placeholder="Enter quantity"
+                                value={form.itemCount}
                                 onChange={(e) =>
                                     setForm({
                                         ...form,
-                                        roomId: Number(e.target.value),
+                                        itemCount: +normalizeNumberInput(e.target.value),
                                     })
                                 }
                             />
-                        )}
+                        </div>
 
-                        <Input
-                            placeholder="Item Count"
-                            type="number"
-                            value={form.itemCount}
-                            onChange={(e) =>
-                                setForm({ ...form, itemCount: Number(e.target.value) })
-                            }
-                        />
+                        {/* Pickup Date */}
+                        {/* <div className="space-y-1">
+                            <Label>Pickup Date & Time *</Label>
 
-                        <Input
-                            type="datetime-local"
-                            value={form.pickupDate}
-                            onChange={(e) =>
-                                setForm({ ...form, pickupDate: e.target.value })
-                            }
-                        />
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="heroOutline"
+                                        className="w-full justify-start text-left font-normal"
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {form.pickupDate
+                                            ? format(
+                                                new Date(form.pickupDate),
+                                                "dd MMM yyyy, hh:mm a"
+                                            )
+                                            : "Select pickup date"}
+                                    </Button>
+                                </PopoverTrigger>
 
+                                <PopoverContent className="p-0 w-auto">
+                                    <Calendar
+                                        mode="single"
+                                        selected={
+                                            form.pickupDate
+                                                ? new Date(form.pickupDate)
+                                                : undefined
+                                        }
+                                        onSelect={(date) =>
+                                            setForm({
+                                                ...form,
+                                                pickupDate: toISOString(date),
+                                            })
+                                        }
+                                        initialFocus
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div> */}
+                        <div className="space-y-1">
+                            <Label>Pickup Date And time*</Label>
+                            <div className="block">
+
+                                <DatePicker
+                                    selected={parseDate(form.pickupDate)}
+                                    onChange={(date) => {
+                                        setForm((prev) => ({
+                                            ...prev,
+                                            pickupDate: formatDate(date),
+                                        }));
+                                    }}
+                                    showTimeSelect
+                                    timeFormat="HH:mm"
+                                    timeIntervals={15}
+                                    dateFormat="dd/MM/yyyy HH:mm"
+                                    placeholderText="Select date & time"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                    wrapperClassName="w-full"
+                                    minDate={new Date()}
+                                />
+                            </div>
+                        </div>
+
+
+                        {/* Submit */}
                         <Button
                             variant="hero"
                             className="w-full"
@@ -403,6 +556,7 @@ export default function LaundryOrdersManagement() {
                     </div>
                 </SheetContent>
             </Sheet>
+
 
             {/* Status Confirm Modal */}
             <Dialog

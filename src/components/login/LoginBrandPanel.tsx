@@ -66,7 +66,7 @@ const LoginBrandPanel = ({ className = "" }: { className?: string }) => {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: 0.4 + index * 0.1, ease: "easeOut" }}
-              className="flex items-center gap-4 p-4 bg-card/80 backdrop-blur-sm rounded-xl border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+              className="flex items-center gap-4 p-4 bg-card/80 backdrop-blur-sm rounded-[3px] border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
             >
               <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                 <feature.icon className="w-5 h-5 text-primary" />

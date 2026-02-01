@@ -57,8 +57,15 @@ type EnquiryForm = {
 
 /* ---------------- Helpers ---------------- */
 const parseDate = (v?: string) => (v ? new Date(v) : null);
-const formatDate = (d: Date | null) =>
-    d ? d.toISOString().slice(0, 10) : "";
+
+const formatDate = (date: Date | null) => {
+    if (!date) return "";
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;   // local timezone safe
+};
+
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_REGEX = /^[6-9]\d{9}$/;
@@ -239,6 +246,38 @@ export default function EnquiryCreate() {
         })
     }
 
+    function getFloorName(floor: number): string {
+        if (floor === 0) return "G|F";
+
+        const romanMap: { value: number; symbol: string }[] = [
+            { value: 1000, symbol: "M" },
+            { value: 900, symbol: "CM" },
+            { value: 500, symbol: "D" },
+            { value: 400, symbol: "CD" },
+            { value: 100, symbol: "C" },
+            { value: 90, symbol: "XC" },
+            { value: 50, symbol: "L" },
+            { value: 40, symbol: "XL" },
+            { value: 10, symbol: "X" },
+            { value: 9, symbol: "IX" },
+            { value: 5, symbol: "V" },
+            { value: 4, symbol: "IV" },
+            { value: 1, symbol: "I" },
+        ];
+
+        let num = floor;
+        let roman = "";
+
+        for (const { value, symbol } of romanMap) {
+            while (num >= value) {
+                roman += symbol;
+                num -= value;
+            }
+        }
+
+        return `${roman}|F`;
+    }
+
     return (
         <div className="h-screen bg-background overflow-hidden">
             <AppHeader />
@@ -261,7 +300,7 @@ export default function EnquiryCreate() {
                             <div className="w-full sm:w-64 space-y-1">
                                 <Label className="text-xs">Property</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={selectedPropertyId ?? ""}
                                     onChange={(e) =>
                                         setSelectedPropertyId(Number(e.target.value) || null)
@@ -359,7 +398,7 @@ export default function EnquiryCreate() {
                             <div>
                                 <Label>Room Type*</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={form.room_type}
                                     onChange={(e) =>
                                         setForm({ ...form, room_type: e.target.value })
@@ -426,7 +465,7 @@ export default function EnquiryCreate() {
                         <div>
                             <Label>Comments</Label>
                             <textarea
-                                className="w-full min-h-[90px] rounded-xl border px-3 py-2 text-sm"
+                                className="w-full min-h-[90px] rounded-[3px] border px-3 py-2 text-sm"
                                 value={form.comment}
                                 onChange={(e) =>
                                     setForm({ ...form, comment: e.target.value })
@@ -475,43 +514,44 @@ export default function EnquiryCreate() {
                                     Floor {floor}
                                 </h3>
 
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-3">
                                     {rooms.map((room) => (
                                         <div
                                             key={room.id}
                                             className="
-                                                    aspect-square
-                                                    rounded-xl
+                                                    h-[110px]
+                                                    rounded-[3px]
                                                     border
                                                     p-3
                                                     text-sm
                                                     bg-card
                                                     border-border
-                                                    opacity-90
+                                                    transition
+                                                    opacity-95
                                                 "
                                         >
-                                            <div className="flex flex-col items-center justify-center h-full text-center">
-                                                {/* <span className="font-semibold">
-                                                    {room.room_no}
-                                                </span> */}
+                                            <div className="flex flex-col h-full">
 
-                                                <span className="text-xs text-muted-foreground mt-1">
-                                                    {room.room_category_name}
+                                                {/* Top - Floor */}
+                                                <span className="text-xs opacity-70 mb-3 text-left">
+                                                    {getFloorName(room.floor_number)}
                                                 </span>
 
-                                                <span className="text-xs text-muted-foreground">
-                                                    {room.ac_type_name}
+                                                {/* Middle - Price */}
+                                                <div className="flex-1 flex items-center justify-center">
+                                                    <span className="text-[1.4rem] font-semibold text-primary">
+                                                        ₹{room.base_price}/night
+                                                    </span>
+                                                </div>
+
+                                                {/* Bottom - Room Type */}
+                                                <span className="text-xs opacity-70 mt-3 text-left">
+                                                    {room.bed_type_name.split(" ")[0]}|{room.room_category_name}
                                                 </span>
 
-                                                <span className="text-xs text-muted-foreground">
-                                                    {room.bed_type_name.slice(0, 8)}
-                                                </span>
-
-                                                <span className="text-xs font-medium text-primary mt-1">
-                                                    ₹{room.base_price}/night
-                                                </span>
                                             </div>
                                         </div>
+
                                     ))}
                                 </div>
                             </div>

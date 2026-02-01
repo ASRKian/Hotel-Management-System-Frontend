@@ -51,7 +51,7 @@ const PrivacyPolicy = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-white">
       <Header />
 
       <main className="flex-1">
@@ -136,7 +136,7 @@ const PrivacyPolicy = () => {
           </div>
 
           {/* Table of Contents */}
-          <div className="bg-background border border-border rounded-lg p-6 mb-10">
+          <div className="bg-white border border-border rounded-lg p-6 mb-10">
             <h2 className="text-lg font-semibold text-foreground mb-4">
               Table of Contents
             </h2>

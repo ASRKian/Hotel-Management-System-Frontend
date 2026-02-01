@@ -58,7 +58,7 @@ const ModulesSection = () => {
             <Link
               key={index}
               to={`/platform#${module.anchor}`}
-              className="group bg-card p-6 rounded-xl border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300"
+              className="group bg-card p-6 rounded-[3px] border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300"
             >
               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                 <module.icon className="h-6 w-6 text-primary" />

@@ -7,8 +7,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAppSelector } from "@/redux/hook";
+import { useAppDispatch, useAppSelector } from "@/redux/hook";
 import { useGetMeQuery } from "@/redux/services/hmsApi";
+import { logout } from "@/redux/slices/isLoggedInSlice";
 import { LogOut, Settings, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -29,6 +30,7 @@ export default function AppHeader({ user }: Props) {
     })
 
     const navigate = useNavigate()
+    const dispatch = useAppDispatch()
 
     const initials = (() => {
         // if (!user?.name) return "U";
@@ -43,8 +45,9 @@ export default function AppHeader({ user }: Props) {
         return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     })();
 
-    function logout() {
+    function handleLogout() {
         localStorage.clear()
+        dispatch(logout())
         navigate("/login")
     }
 
@@ -97,7 +100,7 @@ export default function AppHeader({ user }: Props) {
 
                     <DropdownMenuSeparator />
 
-                    <DropdownMenuItem className="text-destructive" onClick={logout}>
+                    <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
                         <LogOut className="mr-2 h-4 w-4" />
                         Logout
                     </DropdownMenuItem>

@@ -159,7 +159,7 @@ export default function RoomTypeBasePriceManagement() {
                     {(isSuperAdmin || isOwner) && <div className="mb-4 max-w-sm space-y-2">
                         <Label>Property</Label>
                         <select
-                            className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                            className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                             value={propertyId}
                             onChange={(e) => setPropertyId(+e.target.value)}
                         >
@@ -176,7 +176,7 @@ export default function RoomTypeBasePriceManagement() {
                     </div>}
 
                     {/* Table */}
-                    <div className="rounded-2xl border bg-card overflow-hidden">
+                    <div className="rounded-[5px] border bg-card overflow-hidden">
                         <div className="grid grid-cols-4 gap-4 px-6 py-3 border-b text-sm font-medium text-muted-foreground">
                             <span>Room Category</span>
                             <span>AC Type</span>

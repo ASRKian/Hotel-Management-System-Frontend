@@ -29,6 +29,7 @@ import AppHeader from "@/components/layout/AppHeader";
 import { validateStaff } from "@/utils/validators";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
 import DatePicker from "react-datepicker";
+import countries from '../utils/countries.json'
 
 /* -------------------- Types -------------------- */
 type Staff = {
@@ -73,12 +74,21 @@ const STAFF_INITIAL_VALUE = {
     shift_pattern: "",
     status: "active",
     blood_group: "",
-    id_proof_type: "",
+    id_proof_type: "Aadhaar",
     id_number: "",
     image: null,
     id_proof: null,
     user_id: "",
-    property_id: ""
+    property_id: "",
+    // visa fields (for foreigner)
+    visa_number: "",
+    visa_issue_date: "",
+    visa_expiry_date: "",
+
+    // for ID proof type "Other"
+    other_id_proof: "",
+    nationality: "",
+    country: ""
 }
 
 export default function StaffManagement() {
@@ -95,6 +105,9 @@ export default function StaffManagement() {
     const [statusFilter, setStatusFilter] = useState("");
 
     const [staff, setStaff] = useState<any>(STAFF_INITIAL_VALUE);
+    const [idProofMode, setIdProofMode] = useState<"select" | "other">("select");
+    const [staffImageExists, setStaffImageExists] = useState(false);
+    const [staffIdProofExists, setStaffIdProofExists] = useState<boolean | null>(null);
 
     const debouncedSearch = useDebounce(search, 500);
     const isLoggedIn = useAppSelector(state => state.isLoggedIn.value)
@@ -138,10 +151,53 @@ export default function StaffManagement() {
         }
     }, [myProperties]);
 
+    useEffect(() => {
+        if (mode === "edit" && staff.id) {
+            const img = new Image();
+            img.src = `${import.meta.env.VITE_API_URL}/staff/${staff.id}/image`;
+
+            img.onload = () => setStaffImageExists(true);
+            img.onerror = () => setStaffImageExists(false);
+        } else {
+            setStaffImageExists(false);
+        }
+    }, [mode, staff.id]);
+
+    useEffect(() => {
+        if (mode === "edit" && staff.id) {
+            const img = new Image();
+            img.src = `${import.meta.env.VITE_API_URL}/staff/${staff.id}/id-proof`;
+
+            img.onload = () => setStaffIdProofExists(true);
+            img.onerror = () => setStaffIdProofExists(false);
+        } else {
+            setStaffIdProofExists(false);
+        }
+    }, [mode, staff.id]);
+
+    const downloadImage = async (url: string, filename = "staff-image.jpg") => {
+        try {
+            const res = await fetch(url);
+            const blob = await res.blob();
+
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error("Image download failed", err);
+            toast.error("Failed to download image");
+        }
+    };
 
     const handleSubmit = async () => {
         try {
-            const error = validateStaff(staff, mode, isSuperAdmin);
+            const error = validateStaff(staff, mode, isSuperAdmin, roles?.roles);
 
             if (error) {
                 toast.error(error, {
@@ -222,8 +278,14 @@ export default function StaffManagement() {
     const parseDate = (value?: string) =>
         value ? new Date(value) : null;
 
-    const formatDate = (date: Date | null) =>
-        date ? date.toISOString().slice(0, 10) : "";
+    const formatDate = (date: Date | null) => {
+        if (!date) return "";
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;   // local timezone safe
+    };
+
 
     return (
         <div className="min-h-screen bg-background">
@@ -274,7 +336,7 @@ export default function StaffManagement() {
                             <Label>Properties</Label>
 
                             <select
-                                className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                 value={selectedPropertyId}
                                 onChange={(e) => setSelectedPropertyId(e.target.value)}
                             >
@@ -295,7 +357,7 @@ export default function StaffManagement() {
                         <div className="space-y-2">
                             <Label>Status</Label>
                             <select
-                                className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
                             >
@@ -305,7 +367,7 @@ export default function StaffManagement() {
                             </select>
                         </div>
                     </div>
-                    <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+                    <div className="bg-card rounded-[5px] border border-border shadow-sm overflow-hidden">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -378,7 +440,7 @@ export default function StaffManagement() {
                                                 }}
 
                                             >
-                                                Edit
+                                                View
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -435,18 +497,60 @@ export default function StaffManagement() {
                         {/* Image */}
                         <div className="space-y-2">
                             <Label>Staff Photo</Label>
-                            <div className="relative h-40 rounded-xl border border-border overflow-hidden">
-                                {staff.image ? (
-                                    <img
-                                        src={URL.createObjectURL(staff.image)}
-                                        className="w-full h-full object-cover"
-                                    />
+
+                            <div className="relative h-40 rounded-[3px] border border-border overflow-hidden bg-muted">
+
+                                {/* EDIT MODE */}
+                                {mode === "edit" && staff.id ? (
+                                    <>
+                                        {/* Show image ONLY if confirmed */}
+                                        {staffImageExists === true && (
+                                            <img
+                                                src={`${import.meta.env.VITE_API_URL}/staff/${staff.id}/image`}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        )}
+
+                                        {/* Placeholder when not exists or loading */}
+                                        {(staffImageExists === false || staffImageExists === null) && (
+                                            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                                                <User className="h-6 w-6" />
+                                            </div>
+                                        )}
+
+                                        {/* Download button ONLY if image exists */}
+                                        {staffImageExists === true && (
+                                            <div className="absolute top-2 right-2 z-10">
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    onClick={() =>
+                                                        downloadImage(
+                                                            `${import.meta.env.VITE_API_URL}/staff/${staff.id}/image`,
+                                                            `staff-${staff.first_name}-${staff.id}.jpg`
+                                                        )
+                                                    }
+                                                >
+                                                    Download
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </>
                                 ) : (
-                                    <div className="h-full flex items-center justify-center text-muted-foreground">
-                                        <User className="h-6 w-6" />
-                                    </div>
+                                    /* ADD MODE */
+                                    staff.image ? (
+                                        <img
+                                            src={URL.createObjectURL(staff.image)}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="h-full flex items-center justify-center text-muted-foreground">
+                                            <User className="h-6 w-6" />
+                                        </div>
+                                    )
                                 )}
 
+                                {/* Upload overlay */}
                                 <input
                                     type="file"
                                     accept="image/*"
@@ -597,7 +701,7 @@ export default function StaffManagement() {
                                 <Label>{isSuperAdmin ? "Property" : "Property*"}</Label>
 
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={mode === "add" ? staff.property_id : selectedPropertyId}
                                     onChange={(e) =>
                                         setStaff({ ...staff, property_id: normalizeTextInput(e.target.value) })
@@ -615,13 +719,51 @@ export default function StaffManagement() {
                                         ))}
                                 </select>
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                                <Label>Nationality *</Label>
+                                <select
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
+                                    value={staff.nationality || ""}
+                                    onChange={(e) =>
+                                        setStaff({ ...staff, nationality: normalizeTextInput(e.target.value) })
+                                    }
+                                >
+                                    <option value="">Select nationality</option>
+                                    <option value="indian">Indian</option>
+                                    <option value="non_res_indian">Non Resident Indian</option>
+                                    <option value="foreigner">Foreigner</option>
+                                </select>
+                            </div>
+
+                            {staff.nationality === "foreigner" && (
+                                <div className="space-y-2">
+                                    <Label>Country *</Label>
+                                    <select
+                                        className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
+                                        value={staff.country || ""}
+                                        onChange={(e) =>
+                                            setStaff({ ...staff, country: normalizeTextInput(e.target.value) })
+                                        }
+                                    >
+                                        {
+                                            countries.map((country, i) => {
+                                                return <option value={country} key={i}>{country}</option>
+                                            })
+                                        }
+
+                                    </select>
+                                </div>
+                            )}
+
+
+                            {/* </div> */}
+
+                            {/* <div className="grid grid-cols-1 sm:grid-cols-3 gap-4"> */}
                             <div className="space-y-2">
                                 <Label>Gender*</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={staff.gender}
                                     onChange={(e) => setStaff({ ...staff, gender: normalizeTextInput(e.target.value) })}
                                 >
@@ -635,7 +777,7 @@ export default function StaffManagement() {
                             <div className="space-y-2">
                                 <Label>Marital Status*</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={staff.marital_status}
                                     onChange={(e) =>
                                         setStaff({ ...staff, marital_status: normalizeTextInput(e.target.value) })
@@ -656,29 +798,58 @@ export default function StaffManagement() {
                                     }
                                 />
                             </div>
-                        </div>
+                            {/* </div> */}
 
-                        {/* ID Proof */}
-                        {/* <div className="space-y-2">
+                            {/* ID Proof */}
+                            {/* <div className="space-y-2">
                             <Label>ID Proof</Label> */}
 
-                        {/* <div className="rounded-xl border border-border p-3 space-y-3"> */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* <div className="rounded-[3px] border border-border p-3 space-y-3"> */}
+                            {/* <div className="grid grid-cols-1 sm:grid-cols-3 gap-4"> */}
                             <div className="space-y-2">
                                 <Label>ID Proof Type*</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                                    value={staff.id_proof_type}
-                                    onChange={(e) =>
-                                        setStaff({ ...staff, id_proof_type: normalizeTextInput(e.target.value) })
-                                    }
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
+                                    value={idProofMode === "other" ? "Other" : staff.id_proof_type}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+
+                                        if (value === "Other") {
+                                            setIdProofMode("other");
+                                            setStaff({ ...staff, id_proof_type: "" });
+                                        } else {
+                                            setIdProofMode("select");
+                                            setStaff({ ...staff, id_proof_type: normalizeTextInput(value) });
+                                        }
+                                    }}
                                 >
-                                    <option value="">Select type</option>
                                     <option value="Aadhaar">Aadhaar</option>
                                     <option value="PAN">PAN</option>
                                     <option value="Passport">Passport</option>
+                                    <option value="Driving License">Driving License</option>
+                                    <option value="Voter ID">Voter ID</option>
+                                    <option value="Apaar ID">Apaar ID</option>
+                                    <option value="Passport ID">Passport ID</option>
+                                    <option value="Other">Other</option>
                                 </select>
                             </div>
+
+                            {idProofMode === "other" && (
+                                <div className="space-y-2">
+                                    <Label>Specify ID Proof *</Label>
+                                    <Input
+                                        placeholder="Enter ID proof type"
+                                        value={staff.id_proof_type}
+                                        onChange={(e) =>
+                                            setStaff({
+                                                ...staff,
+                                                id_proof_type: normalizeTextInput(e.target.value)
+                                            })
+                                        }
+                                    />
+                                </div>
+                            )}
+
 
                             <div className="space-y-2">
                                 <Label>ID Number*</Label>
@@ -689,22 +860,89 @@ export default function StaffManagement() {
                                     }
                                 />
                             </div>
+                            {/* </div> */}
+
+                            {staff.nationality === "foreigner" && (
+                                // <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <>
+                                    <div className="space-y-2">
+                                        <Label>Visa Number *</Label>
+                                        <Input
+                                            value={staff.visa_number}
+                                            onChange={(e) =>
+                                                setStaff({ ...staff, visa_number: normalizeTextInput(e.target.value) })
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Visa Issue Date *</Label>
+                                        <DatePicker
+                                            selected={parseDate(staff.visa_issue_date)}
+                                            onChange={(date) =>
+                                                setStaff({ ...staff, visa_issue_date: formatDate(date) })
+                                            }
+                                            dateFormat="dd-MM-yyyy"
+                                            customInput={<Input readOnly />}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Visa Expiry Date *</Label>
+                                        <DatePicker
+                                            selected={parseDate(staff.visa_expiry_date)}
+                                            onChange={(date) =>
+                                                setStaff({ ...staff, visa_expiry_date: formatDate(date) })
+                                            }
+                                            dateFormat="dd-MM-yyyy"
+                                            customInput={<Input readOnly />}
+                                        />
+                                    </div>
+                                </>
+
+                            )}
                         </div>
 
-                        {staff.id_proof_url ? (
-                            <a
-                                href={staff.id_proof_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-sm text-primary hover:underline"
-                            >
-                                View uploaded ID proof
-                            </a>
+                        {/* ID Proof Preview */}
+                        {mode === "edit" && staff.id ? (
+                            staffIdProofExists === true ? (
+                                <div className="space-y-2">
+                                    <Label>ID Proof</Label>
+
+                                    <div className="relative h-48 rounded-[3px] border border-border overflow-hidden bg-muted">
+                                        <img
+                                            src={`${import.meta.env.VITE_API_URL}/staff/${staff.id}/id-proof`}
+                                            className="w-full h-full object-contain bg-black/5"
+                                        />
+
+                                        {/* Download Button */}
+                                        <div className="absolute top-2 right-2 z-10">
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                onClick={() =>
+                                                    downloadImage(
+                                                        `${import.meta.env.VITE_API_URL}/staff/${staff.id}/id-proof`,
+                                                        `staff-${staff.first_name}-${staff.id}-id-proof.jpg`
+                                                    )
+                                                }
+                                            >
+                                                Download
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">
+                                    No ID proof uploaded
+                                </p>
+                            )
                         ) : (
                             <p className="text-sm text-muted-foreground">
                                 No ID proof uploaded
                             </p>
                         )}
+
 
                         <Input
                             type="file"
@@ -718,7 +956,7 @@ export default function StaffManagement() {
                         <div className="space-y-2">
                             <Label>Address</Label>
                             <textarea
-                                className="w-full min-h-[80px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                                className="w-full min-h-[80px] rounded-[3px] border border-border bg-background px-3 py-2 text-sm"
                                 value={staff.address}
                                 onChange={(e) =>
                                     setStaff({ ...staff, address: normalizeTextInput(e.target.value) })
@@ -730,7 +968,7 @@ export default function StaffManagement() {
                             <div className="space-y-2">
                                 <Label>Employment Type</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={staff.employment_type}
                                     onChange={(e) =>
                                         setStaff({ ...staff, employment_type: normalizeTextInput(e.target.value) })
@@ -851,7 +1089,7 @@ export default function StaffManagement() {
                             <div className="space-y-2">
                                 <Label>Role*</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={staff.role_ids[0] || ""}
                                     onChange={(e) =>
                                         setStaff({ ...staff, role_ids: normalizeTextInput(e.target.value) ? [normalizeTextInput(e.target.value)] : [] })

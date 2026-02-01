@@ -34,9 +34,9 @@ const Header = () => {
   const isLoginPage = location.pathname === "/login";
 
   return (
-    <header 
+    <header
       className="sticky z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border transition-[top] duration-200 motion-reduce:transition-none"
-      style={{ top: isRibbonVisible && !isLoginPage ? "40px" : "0px" }}
+      style={{ top: isRibbonVisible && !isLoginPage ? "40px" : "0px", background: "white" }}
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
@@ -52,9 +52,8 @@ const Header = () => {
                 key={item.path}
                 to={item.path}
                 onClick={() => handleNavClick(item.path)}
-                className={`text-sm font-medium transition-colors hover:text-primary ${
-                  isActive(item.path) ? "text-primary" : "text-foreground"
-                }`}
+                className={`text-sm font-medium transition-colors hover:text-primary ${isActive(item.path) ? "text-primary" : "text-foreground"
+                  }`}
               >
                 {item.name}
               </Link>
@@ -96,9 +95,8 @@ const Header = () => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`text-sm font-medium transition-colors hover:text-primary px-2 py-1 ${
-                    isActive(item.path) ? "text-primary" : "text-foreground"
-                  }`}
+                  className={`text-sm font-medium transition-colors hover:text-primary px-2 py-1 ${isActive(item.path) ? "text-primary" : "text-foreground"
+                    }`}
                   onClick={() => {
                     setIsMenuOpen(false);
                     handleNavClick(item.path);
@@ -108,8 +106,8 @@ const Header = () => {
                 </Link>
               ))}
               {!isLoginPage && (
-                <Link 
-                  to="/contact" 
+                <Link
+                  to="/contact"
                   onClick={() => {
                     setIsMenuOpen(false);
                     handleNavClick("/contact");

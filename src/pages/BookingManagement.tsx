@@ -43,6 +43,9 @@ import VehiclesEmbedded from "@/components/layout/VehiclesEmbedded";
 import DatePicker from "react-datepicker";
 import PaymentsEmbedded from "@/components/layout/PaymentEmbedded";
 import { formatToDDMMYYYY } from "@/utils/formatToDDMMYYYY";
+import LaundryEmbedded from "@/components/layout/LaundryEmbedded";
+import BookingLogsEmbedded from "@/components/layout/BookingLogsEmbedded";
+import RestaurantOrdersEmbedded from "@/components/layout/RestaurantOrdersEmbedded";
 
 const REQUIRED_SCOPE_BY_STATUS: Record<string, "upcoming" | "past" | "all"> = {
     CONFIRMED: "upcoming",
@@ -112,7 +115,8 @@ export default function BookingsManagement() {
     })
 
     const [cancelBooking] = useCancelBookingMutation()
-    const [updateBooking] = useUpdateBookingMutation()
+    const [updateBooking, { error }] = useUpdateBookingMutation()
+    console.log("🚀 ~ BookingsManagement ~ error:", error)
     const [updateBookingStatus] = useUpdateBookingMutation()
 
     async function handleManage(id: string) {
@@ -138,16 +142,22 @@ export default function BookingsManagement() {
     async function handleUpdateBooking() {
         if (!selectedBooking) return;
 
-        const promise = updateBooking({ booking_id: selectedBooking?.booking?.id, status: updatedStatus });
+        const promise = updateBooking({ booking_id: selectedBooking?.booking?.id, status: updatedStatus }).unwrap();
 
-        toast.promise(promise, {
+        await toast.promise(promise, {
             pending: "Updating booking...",
             success: "Booking updated successfully",
-            error: "Failed to update booking",
+            error: {
+                render({ data }) {
+                    return data?.data?.message || data?.message || "Failed to update booking";
+                }
+            }
         });
 
+        console.log("🚀 ~ handleUpdateBooking ~ promise:", promise)
         setConfirmStatusOpen(false);
         setDetailsOpen(false);
+
     }
 
     useEffect(() => {
@@ -216,11 +226,11 @@ export default function BookingsManagement() {
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {/* Left Stats */}
                     <div className="space-y-4">
-                        <SummaryCard label="Final Amount" value={`₹ ${booking?.final_amount}`} />
-                        <SummaryCard label="Paid Amount" value={`₹ ${booking?.paid_amount ?? 0}`} />
+                        <SummaryCard label="Final Amount" value={`₹ ${+(booking?.final_amount || 0) + +(booking?.restaurant_total_amount || 0)}`} />
+                        <SummaryCard label="Paid Amount" value={`₹ ${+(booking?.paid_amount ?? 0) + +(booking?.restaurant_paid_amount || 0)}`} />
                         <SummaryCard
                             label="Remaining Amount"
-                            value={`₹ ${(booking?.final_amount - booking?.paid_amount) || 0}`}
+                            value={`₹ ${(+(booking?.final_amount || 0) + +(booking?.restaurant_total_amount || 0)) - (+(booking?.paid_amount ?? 0) + +(booking?.restaurant_paid_amount || 0)) || 0}`}
                         // highlight
                         />
                     </div>
@@ -253,7 +263,7 @@ export default function BookingsManagement() {
     function SummaryCard({ label, value, highlight }: any) {
         return (
             <div
-                className={`rounded-xl p-4 text-white ${highlight ? "bg-destructive" : "bg-primary"
+                className={`rounded-[3px] p-4 text-white ${highlight ? "bg-destructive" : "bg-primary"
                     }`}
             >
                 <p className="text-sm opacity-90">{label}</p>
@@ -264,7 +274,7 @@ export default function BookingsManagement() {
 
     function InfoCard({ label, value }: any) {
         return (
-            <div className="rounded-xl border border-border bg-card p-4">
+            <div className="rounded-[3px] border border-border bg-card p-4">
                 <p className="text-xs text-muted-foreground">{label}</p>
                 <p className="font-medium mt-1">{value}</p>
             </div>
@@ -308,6 +318,18 @@ export default function BookingsManagement() {
         return <PaymentsEmbedded bookingId={bookingId} propertyId={propertyId} />;
     }
 
+    function BookingLaundryTab({ bookingId }: any) {
+        return <LaundryEmbedded bookingId={bookingId} />;
+    }
+
+    function BookingRestaurantOrderTab({ bookingId }: any) {
+        return <RestaurantOrdersEmbedded bookingId={bookingId} />;
+    }
+
+    function BookingLogsTab({ bookingId, propertyId }: any) {
+        return <BookingLogsEmbedded bookingId={bookingId} />;
+    }
+
     function ComingSoon({ label }: { label: string }) {
         return (
             <div className="h-40 flex items-center justify-center text-muted-foreground">
@@ -319,8 +341,14 @@ export default function BookingsManagement() {
     const parseDate = (value?: string) =>
         value ? new Date(value) : null;
 
-    const formatDate = (date: Date | null) =>
-        date ? date.toISOString().slice(0, 10) : "";
+    const formatDate = (date: Date | null) => {
+        if (!date) return "";
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;   // local timezone safe
+    };
+
 
 
     return (
@@ -355,7 +383,7 @@ export default function BookingsManagement() {
                         {(isSuperAdmin || isOwner) && <div className="space-y-1">
                             <Label>Property</Label>
                             <select
-                                className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                 value={propertyId ?? ""}
                                 onChange={(e) =>
                                     setPropertyId(
@@ -375,7 +403,7 @@ export default function BookingsManagement() {
                         <div className="space-y-1">
                             <Label>Scope</Label>
                             <select
-                                className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                 value={scope}
                                 onChange={(e) => {
                                     setScope(e.target.value);
@@ -391,7 +419,7 @@ export default function BookingsManagement() {
                         <div className="space-y-1">
                             <Label>Status</Label>
                             <select
-                                className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                 value={status}
                                 onChange={(e) => {
                                     setStatus(e.target.value);
@@ -494,7 +522,7 @@ export default function BookingsManagement() {
                     </div>
 
                     {/* Table */}
-                    <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                    <div className="bg-card border border-border rounded-[5px] overflow-hidden">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -539,7 +567,7 @@ export default function BookingsManagement() {
                                                     handleManage(b.id)
                                                 }
                                             >
-                                                Manage
+                                                View
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -599,7 +627,7 @@ export default function BookingsManagement() {
                         {/* Status Update */}
                         <div className="flex items-center gap-3 me-8">
                             <select
-                                className="h-9 rounded-xl border border-border bg-background px-3 text-sm"
+                                className="h-9 rounded-[3px] border border-border bg-background px-3 text-sm"
                                 value={updatedStatus || selectedBooking?.booking.booking_status}
                                 onChange={(e) => setUpdatedStatus(e.target.value)}
                                 disabled={selectedBooking?.booking.booking_status === "CANCELLED"}
@@ -638,6 +666,8 @@ export default function BookingsManagement() {
                                 <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
                                 <TabsTrigger value="payments">Payments</TabsTrigger>
                                 <TabsTrigger value="laundry">Laundry</TabsTrigger>
+                                <TabsTrigger value="orders">Restaurant Orders</TabsTrigger>
+                                <TabsTrigger value="logs">Logs</TabsTrigger>
                             </TabsList>
                         </div>
 
@@ -656,7 +686,7 @@ export default function BookingsManagement() {
                             </TabsContent>
 
                             <TabsContent value="vehicles">
-                                <BookingVehiclesTab bookingId={selectedBooking?.booking.id} rooms={selectedBooking?.booking.rooms}/>
+                                <BookingVehiclesTab bookingId={selectedBooking?.booking.id} rooms={selectedBooking?.booking.rooms} />
                             </TabsContent>
 
                             <TabsContent value="payments">
@@ -664,7 +694,15 @@ export default function BookingsManagement() {
                             </TabsContent>
 
                             <TabsContent value="laundry">
-                                <ComingSoon label="Laundry" />
+                                <BookingLaundryTab bookingId={selectedBooking?.booking.id} />
+                            </TabsContent>
+
+                            <TabsContent value="orders">
+                                <BookingRestaurantOrderTab bookingId={selectedBooking?.booking.id} />
+                            </TabsContent>
+
+                            <TabsContent value="logs">
+                                <BookingLogsTab bookingId={selectedBooking?.booking.id} />
                             </TabsContent>
                         </div>
                     </Tabs>

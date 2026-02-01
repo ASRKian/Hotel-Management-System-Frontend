@@ -41,7 +41,7 @@ const Platform = () => {
       <Header />
       <main className="flex-1">
         {/* Hero */}
-        <section className="py-20 bg-background">
+        <section className="py-20 bg-white">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h1 className="text-4xl sm:text-5xl font-bold text-foreground">
               The unified hotel operations platform
@@ -78,7 +78,7 @@ const Platform = () => {
                 { icon: UserCheck, title: "Guest-centric design", desc: "Every feature built around the guest experience." },
                 { icon: BarChart3, title: "Scales with you", desc: "From single properties to multi-property groups." },
               ].map((item, i) => (
-                <div key={i} className="group bg-card p-6 rounded-xl border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300">
+                <div key={i} className="group bg-card p-6 rounded-[3px] border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300">
                   <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                     <item.icon className="h-6 w-6 text-primary" />
                   </div>
@@ -91,11 +91,11 @@ const Platform = () => {
         </section>
 
         {/* Reservations */}
-        <section id="reservations" className="py-20 bg-background scroll-mt-20">
+        <section id="reservations" className="py-20 bg-white scroll-mt-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div>
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
+                <div className="w-14 h-14 rounded-[3px] bg-primary/10 flex items-center justify-center mb-6">
                   <Calendar className="h-7 w-7 text-primary" />
                 </div>
                 <h2 className="text-3xl font-bold text-foreground mb-4">
@@ -122,11 +122,11 @@ const Platform = () => {
                   Outcome: Fewer errors, higher occupancy, smoother bookings.
                 </p>
               </div>
-              <div className="bg-muted rounded-2xl p-8">
+              <div className="bg-muted rounded-[5px] p-8">
                 <img
                   src="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
                   alt="Hotel reservation system interface"
-                  className="rounded-xl shadow-lg w-full"
+                  className="rounded-[3px] shadow-lg w-full"
                 />
               </div>
             </div>
@@ -137,15 +137,15 @@ const Platform = () => {
         <section id="front-office" className="py-20 bg-muted scroll-mt-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="order-2 lg:order-1 bg-card rounded-2xl p-8">
+              <div className="order-2 lg:order-1 bg-card rounded-[5px] p-8">
                 <img
                   src="https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
                   alt="Hotel front desk operations"
-                  className="rounded-xl shadow-lg w-full"
+                  className="rounded-[3px] shadow-lg w-full"
                 />
               </div>
               <div className="order-1 lg:order-2">
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
+                <div className="w-14 h-14 rounded-[3px] bg-primary/10 flex items-center justify-center mb-6">
                   <UserCheck className="h-7 w-7 text-primary" />
                 </div>
                 <h2 className="text-3xl font-bold text-foreground mb-4">
@@ -176,11 +176,11 @@ const Platform = () => {
         </section>
 
         {/* Housekeeping */}
-        <section id="housekeeping" className="py-20 bg-background scroll-mt-20">
+        <section id="housekeeping" className="py-20 bg-white scroll-mt-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div>
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
+                <div className="w-14 h-14 rounded-[3px] bg-primary/10 flex items-center justify-center mb-6">
                   <Sparkles className="h-7 w-7 text-primary" />
                 </div>
                 <h2 className="text-3xl font-bold text-foreground mb-4">
@@ -206,11 +206,11 @@ const Platform = () => {
                   Outcome: Faster room turnover, consistent quality standards.
                 </p>
               </div>
-              <div className="bg-muted rounded-2xl p-8">
+              <div className="bg-muted rounded-[5px] p-8">
                 <img
                   src="https://images.unsplash.com/photo-1590490360182-c33d57733427?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
                   alt="Clean hotel room"
-                  className="rounded-xl shadow-lg w-full"
+                  className="rounded-[3px] shadow-lg w-full"
                 />
               </div>
             </div>
@@ -221,15 +221,15 @@ const Platform = () => {
         <section id="fnb" className="py-20 bg-muted scroll-mt-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="order-2 lg:order-1 bg-card rounded-2xl p-8">
+              <div className="order-2 lg:order-1 bg-card rounded-[5px] p-8">
                 <img
                   src="https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
                   alt="Hotel restaurant and dining"
-                  className="rounded-xl shadow-lg w-full"
+                  className="rounded-[3px] shadow-lg w-full"
                 />
               </div>
               <div className="order-1 lg:order-2">
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
+                <div className="w-14 h-14 rounded-[3px] bg-primary/10 flex items-center justify-center mb-6">
                   <UtensilsCrossed className="h-7 w-7 text-primary" />
                 </div>
                 <h2 className="text-3xl font-bold text-foreground mb-4">
@@ -260,11 +260,11 @@ const Platform = () => {
         </section>
 
         {/* Analytics */}
-        <section id="analytics" className="py-20 bg-background scroll-mt-20">
+        <section id="analytics" className="py-20 bg-white scroll-mt-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div>
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
+                <div className="w-14 h-14 rounded-[3px] bg-primary/10 flex items-center justify-center mb-6">
                   <BarChart3 className="h-7 w-7 text-primary" />
                 </div>
                 <h2 className="text-3xl font-bold text-foreground mb-4">
@@ -290,11 +290,11 @@ const Platform = () => {
                   Outcome: Data-backed decisions, proactive management.
                 </p>
               </div>
-              <div className="bg-muted rounded-2xl p-8">
+              <div className="bg-muted rounded-[5px] p-8">
                 <img
                   src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
                   alt="Analytics dashboard"
-                  className="rounded-xl shadow-lg w-full"
+                  className="rounded-[3px] shadow-lg w-full"
                 />
               </div>
             </div>
@@ -305,7 +305,7 @@ const Platform = () => {
         <section id="integrations" className="py-20 bg-muted scroll-mt-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-12">
-              <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+              <div className="w-14 h-14 rounded-[3px] bg-primary/10 flex items-center justify-center mx-auto mb-6">
                 <Plug className="h-7 w-7 text-primary" />
               </div>
               <h2 className="text-3xl font-bold text-foreground mb-4">
@@ -326,7 +326,7 @@ const Platform = () => {
                 "Revenue Management",
                 "Guest Messaging",
               ].map((item, i) => (
-                <div key={i} className="group bg-card p-4 rounded-xl border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 text-center">
+                <div key={i} className="group bg-card p-4 rounded-[3px] border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 text-center">
                   <p className="font-medium text-foreground group-hover:text-primary transition-colors">{item}</p>
                 </div>
               ))}
@@ -335,10 +335,10 @@ const Platform = () => {
         </section>
 
         {/* Data & Security */}
-        <section className="py-20 bg-background">
+        <section className="py-20 bg-white">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-3xl mx-auto text-center">
-              <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+              <div className="w-14 h-14 rounded-[3px] bg-primary/10 flex items-center justify-center mx-auto mb-6">
                 <Shield className="h-7 w-7 text-primary" />
               </div>
               <h2 className="text-3xl font-bold text-foreground mb-4">
@@ -369,7 +369,7 @@ const Platform = () => {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col md:flex-row items-center justify-between gap-8 max-w-4xl mx-auto">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-secondary/20 flex items-center justify-center">
+                <div className="w-14 h-14 rounded-[3px] bg-secondary/20 flex items-center justify-center">
                   <Headphones className="h-7 w-7 text-secondary" />
                 </div>
                 <div>

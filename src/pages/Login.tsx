@@ -17,7 +17,7 @@ const Login = () => {
 
       <Header />
 
-      <main className="min-h-[calc(100vh-64px)] lg:min-h-screen lg:grid lg:grid-cols-2">
+      <main className="min-h-[calc(100vh-64px)] lg:min-h-screen lg:grid lg:grid-cols-2 bg-white">
         {/* Left Column - Brand Panel (Desktop only) */}
         <LoginBrandPanel />
 

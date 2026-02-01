@@ -246,7 +246,7 @@ export default function PackageManagement() {
                     {(isSuperAdmin || isOwner) && <div className="mb-4 max-w-sm space-y-2">
                         <Label>Property</Label>
                         <select
-                            className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                            className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                             value={selectedPropertyId}
                             onChange={(e) => setSelectedPropertyId(e.target.value)}
                         >
@@ -264,7 +264,7 @@ export default function PackageManagement() {
 
 
                     {/* Table */}
-                    <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+                    <div className="bg-card rounded-[5px] border border-border shadow-sm overflow-hidden">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -348,7 +348,7 @@ export default function PackageManagement() {
                             sm:max-w-xl
                             max-h-[88vh]
                             overflow-y-auto
-                            rounded-2xl
+                            rounded-[5px]
                             scrollbar-hide
                         ">
                     <motion.div
@@ -372,7 +372,7 @@ export default function PackageManagement() {
                                     className="
                                         h-10
                                         w-full
-                                        rounded-xl
+                                        rounded-[3px]
                                         bg-background
                                         px-3
                                         flex
@@ -410,7 +410,7 @@ export default function PackageManagement() {
                                     className="
                                         h-10
                                         w-full
-                                        rounded-xl
+                                        rounded-[3px]
                                         bg-background
                                         px-3
                                         flex
@@ -425,7 +425,7 @@ export default function PackageManagement() {
                                 </p>
                                 : <textarea
                                     // readOnly={!(isSuperAdmin || isOwner || isAdmin) || (mode === "edit" && selectedPackage?.system_generated)}
-                                    className="w-full min-h-[100px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                                    className="w-full min-h-[100px] rounded-[3px] border border-border bg-background px-3 py-2 text-sm"
                                     value={selectedPackage?.description}
                                     onChange={(e) => {
                                         const next = e.target.value

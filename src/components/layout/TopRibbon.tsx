@@ -29,11 +29,12 @@ const TopRibbon = () => {
       <div
         className={cn(
           "fixed top-0 left-0 right-0 z-[60] bg-[hsl(0,0%,100%)] border-b border-border transition-all duration-200 ease-out",
-          "motion-reduce:transition-none",
+          "motion-reduce:transition-none ",
           isVisible
             ? "translate-y-0 opacity-100"
             : "-translate-y-full opacity-0 pointer-events-none"
         )}
+        // style={{background: "white"}}
       >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-10">
@@ -116,7 +117,7 @@ const TopRibbon = () => {
       {/* Spacer to prevent content jump */}
       <div 
         className={cn(
-          "transition-all duration-200 motion-reduce:transition-none",
+          "transition-all duration-200 motion-reduce:transition-none bg-white",
           isVisible ? "h-10" : "h-0"
         )}
       />

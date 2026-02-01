@@ -23,7 +23,7 @@ export default function Sidebar() {
 
     useEffect(() => {
         if (!isLoggedIn) return
-        sidebar("sidebar")
+        sidebar(undefined)
     }, [isLoggedIn])
 
 
@@ -48,7 +48,7 @@ export default function Sidebar() {
 
                 {/* Property Info */}
                 {isLoggedIn && !(isSuperAdmin || isOwner) && <div className="px-4 py-3 border-b border-border">
-                    <div className="rounded-xl bg-muted/40 px-3 py-2 max-h-20 overflow-y-auto scrollbar-thin">
+                    <div className="rounded-[3px] bg-muted/40 px-3 py-2 max-h-20 overflow-y-auto scrollbar-thin">
                         <p className="text-sm font-semibold text-foreground truncate">
                             {propertyAddress?.brand_name}
                         </p>
@@ -120,26 +120,37 @@ function SidebarLink({ label, active = false, keyProp, endpoint }: any) {
             key={keyProp + label}
             onClick={() => navigate(endpoint)}
             className={cn(
-                "group w-full flex items-center border-b gap-3 px-3 py-3 rounded-xl text-sm transition-all duration-200",
+                "group w-full flex items-center gap-3 px-3 py-1.5 mt-1 rounded-[3px] text-[13px] transition-all duration-200",
+                "focus:outline-none",
                 active
                     ? "bg-primary text-primary-foreground shadow-md"
-                    : "bg-card hover:bg-muted hover:shadow-sm text-foreground"
+                    : "bg-transparent text-foreground hover:bg-primary/10"
             )}
         >
             {/* Icon */}
             <div
                 className={cn(
-                    "h-9 w-9 rounded-lg flex items-center justify-center transition-colors",
+                    "h-8 w-8 rounded-lg flex items-center justify-center transition-all duration-200",
                     active
                         ? "bg-primary-foreground/20"
-                        : "bg-muted group-hover:bg-primary/10"
+                        : "bg-primary/5 group-hover:bg-primary/10"
                 )}
             >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight
+                    className={cn(
+                        "h-4 w-4 transition-colors",
+                        active ? "text-primary-foreground" : "text-primary"
+                    )}
+                />
             </div>
 
             {/* Label */}
-            <span className="font-medium truncate">
+            <span
+                className={cn(
+                    "font-medium truncate transition-colors",
+                    active ? "text-primary-foreground" : "text-foreground"
+                )}
+            >
                 {label}
             </span>
         </button>

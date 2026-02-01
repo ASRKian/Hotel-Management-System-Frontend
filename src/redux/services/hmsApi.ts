@@ -27,7 +27,11 @@ export const hmsApi = createApi({
     "Vendors",
     "LaundryPricing",
     "LaundryOrders",
-    "Enquiries"
+    "Enquiries",
+    "Menu",
+    "Orders",
+    "Tables",
+    "Kitchen"
   ],
   endpoints: (builder) => ({
 
@@ -300,6 +304,16 @@ export const hmsApi = createApi({
       providesTags: ["Rooms"]
     }),
 
+    getRoomsByBooking: builder.query({
+      query: (bookingId) => {
+        return {
+          url: `/rooms/booking/${bookingId}`,
+          method: "GET",
+        }
+      },
+      providesTags: ["Rooms"]
+    }),
+
     addRoom: builder.mutation({
       query: (payload) => {
         return {
@@ -544,6 +558,16 @@ export const hmsApi = createApi({
       providesTags: ["Bookings"]
     }),
 
+    todayInHouseBookingIds: builder.query({
+      query: ({ propertyId }) => {
+        return {
+          url: `/bookings/${propertyId}/today-in-house-bookings`,
+          method: "GET",
+        }
+      },
+      providesTags: ["Bookings"]
+    }),
+
     createBooking: builder.mutation({
       query: (payload) => {
         return {
@@ -749,6 +773,16 @@ export const hmsApi = createApi({
       providesTags: ["Vendors"]
     }),
 
+    getAllPropertyVendors: builder.query({
+      query: ({ propertyId }) => {
+        return {
+          url: `/vendors/all/property/${propertyId}`,
+          method: "GET",
+        }
+      },
+      providesTags: ["Vendors"]
+    }),
+
     createVendor: builder.mutation({
       query: (payload) => {
         return {
@@ -813,6 +847,16 @@ export const hmsApi = createApi({
       providesTags: ["LaundryOrders"]
     }),
 
+    getBookingLaundryOrders: builder.query({
+      query: (bookingId) => {
+        return {
+          url: `/laundries/orders/booking/${bookingId}`,
+          method: "GET",
+        }
+      },
+      providesTags: ["LaundryOrders"]
+    }),
+
     createLaundryOrder: builder.mutation({
       query: (payload) => {
         return {
@@ -866,7 +910,206 @@ export const hmsApi = createApi({
       },
       invalidatesTags: ["Enquiries"]
     }),
+
+    getPropertyMenu: builder.query({
+      query: ({ propertyId, page }) => {
+        return {
+          url: `/menu/property/${propertyId}?page=${page}`,
+          method: "GET",
+        }
+      },
+      providesTags: ["Menu"]
+    }),
+
+    getPropertyMenuLight: builder.query({
+      query: (propertyId) => {
+        return {
+          url: `/menu/property/${propertyId}/light`,
+          method: "GET",
+        }
+      },
+      providesTags: ["Menu"]
+    }),
+
+    createMenuItem: builder.mutation({
+      query: (payload) => {
+        return {
+          url: `/menu`,
+          method: "POST",
+          body: payload
+        }
+      },
+      invalidatesTags: ["Menu"]
+    }),
+
+    updateMenuItem: builder.mutation({
+      query: ({ id, payload }) => {
+        return {
+          url: `/menu/${id}`,
+          method: "PUT",
+          body: payload
+        }
+      },
+      invalidatesTags: ["Menu"]
+    }),
+
+    getPropertyOrders: builder.query({
+      query: ({ propertyId, page, status }) => {
+        return {
+          url: `/orders/property/${propertyId}?page=${page}&status=${status}`,
+          method: "GET",
+        }
+      },
+      providesTags: ["Orders"]
+    }),
+
+    getOrderById: builder.query({
+      query: (id) => {
+        return {
+          url: `/orders/${id}`,
+          method: "GET",
+        }
+      },
+      providesTags: ["Orders"]
+    }),
+
+    getOrderByBooking: builder.query({
+      query: (bookingId) => {
+        return {
+          url: `/orders/booking/${bookingId}`,
+          method: "GET",
+        }
+      },
+      providesTags: ["Orders"]
+    }),
+
+    createOrder: builder.mutation({
+      query: (payload) => {
+        return {
+          url: `/orders`,
+          method: "POST",
+          body: payload
+        }
+      },
+      invalidatesTags: ["Orders", "Bookings"]
+    }),
+
+    updateOrderStatus: builder.mutation({
+      query: ({ id, payload }) => {
+        return {
+          url: `/orders/${id}/status`,
+          method: "PATCH",
+          body: payload
+        }
+      },
+      invalidatesTags: ["Orders", "Bookings"]
+    }),
+
+    updateOrderPayment: builder.mutation({
+      query: ({ id, payload }) => {
+        return {
+          url: `/orders/${id}/payment`,
+          method: "PATCH",
+          body: payload
+        }
+      },
+      invalidatesTags: ["Orders"]
+    }),
+
+    getRestaurantTable: builder.query({
+      query: ({ propertyId, page }) => {
+        return {
+          url: `/tables/property/${propertyId}?page=${page}`,
+          method: "GET",
+        }
+      },
+      providesTags: ["Tables"]
+    }),
+
+    getRestaurantTablesLight: builder.query({
+      query: (propertyId) => {
+        return {
+          url: `/tables/property/${propertyId}/light`,
+          method: "GET",
+        }
+      },
+      providesTags: ["Tables"]
+    }),
+
+    createRestaurantTable: builder.mutation({
+      query: (payload) => {
+        return {
+          url: `/tables`,
+          method: "POST",
+          body: payload
+        }
+      },
+      invalidatesTags: ["Tables"]
+    }),
+
+    updateRestaurantTable: builder.mutation({
+      query: ({ id, payload }) => {
+        return {
+          url: `/tables/${id}`,
+          method: "PUT",
+          body: payload
+        }
+      },
+      invalidatesTags: ["Tables"]
+    }),
+
+    getKitchenInventory: builder.query({
+      query: ({ propertyId, page }) => {
+        return {
+          url: `/kitchen/property/${propertyId}?page=${page}`,
+          method: "GET",
+        }
+      },
+      providesTags: ["Kitchen"]
+    }),
+
+    createInventory: builder.mutation({
+      query: (payload) => {
+        return {
+          url: `/kitchen`,
+          method: "POST",
+          body: payload
+        }
+      },
+      invalidatesTags: ["Kitchen"]
+    }),
+
+    updateInventory: builder.mutation({
+      query: ({ id, payload }) => {
+        return {
+          url: `/kitchen/${id}`,
+          method: "PUT",
+          body: payload
+        }
+      },
+      invalidatesTags: ["Kitchen"]
+    }),
+
+    updateInventoryBulk: builder.mutation({
+      query: (payload) => {
+        return {
+          url: `/kitchen/bulk`,
+          method: "PUT",
+          body: payload
+        }
+      },
+      invalidatesTags: ["Kitchen"]
+    }),
+
+    getLogs: builder.query({
+      query: ({ tableName, eventId }) => {
+        return {
+          url: `/audits?eventId=${eventId}&tableName=${tableName}`,
+          method: "GET",
+        }
+      },
+    }),
   }),
 })
 
-export const { useLazyGetAllRolesQuery, useLazyGetSidebarLinksQuery, useLazyGetAllSidebarLinksQuery, useLazyGetSidebarPermissionQuery, useGetSidebarPermissionQuery, usePostRoleSidebarLinkMutation, useCreateRoleMutation, useGetPropertiesQuery, useUpdatePropertiesMutation, useAddPropertyMutation, useAddPropertyBySuperAdminMutation, useGetPropertyFloorsQuery, useLazyGetPropertyFloorsQuery, useBulkUpsertPropertyFloorsMutation, useGetStaffQuery, useGetStaffByIdQuery, useAddStaffMutation, useUpdateStaffMutation, useGetStaffImageQuery, useGetStaffIdProofQuery, useGetStaffByPropertyQuery, useLazyGetStaffByPropertyQuery, useLazyGetStaffByIdQuery, useGetMeQuery, useLazyGetMeQuery, useLazyGetUsersByRoleQuery, useGetAllRolesQuery, useCreateUserMutation, useGetMyPropertiesQuery, useGetRoomsQuery, useBulkUpdateRoomsMutation, useBulkUpsertRoomsMutation, useGetPackageByIdQuery, useGetPackagesByPropertyQuery, useCreatePackageMutation, useUpdatePackageMutation, useDeactivatePackageMutation, useAddRoomMutation, useGetPackagesByUserQuery, useAvailableRoomsQuery, useCreateBookingMutation, useGetPropertyTaxQuery, useGetBookingByIdQuery, useGetBookingsQuery, useCancelBookingMutation, useUpdateBookingMutation, useAddGuestsByBookingMutation, useGetGuestsByBookingQuery, useUpdateGuestsMutation, useAddVehiclesMutation, useGetVehiclesByBookingQuery, useGetPropertyAddressByUserQuery, useGetPaymentsByPropertyQuery, useGetPaymentsByIdQuery, useGetPaymentsByBookingIdQuery, useCreatePaymentMutation, useGetRoomTypesQuery, useUpdateRoomTypesMutation, useLazyGetUsersByPropertyAndRoleQuery, useRoomsStatusQuery, useUpdatePackagesBulkMutation, useGetPropertyBanksQuery, useUpsertPropertyBanksMutation, useGetPropertyVendorsQuery, useCreateVendorMutation, useUpdateVendorMutation, useGetPropertyLaundryPricingQuery, useCreateLaundryPricingMutation, useUpdateLaundryPricingMutation, useGetPropertyLaundryOrdersQuery, useCreateLaundryOrderMutation, useUpdateLaundryOrderMutation, useGetPropertyEnquiriesQuery, useCreateEnquiryMutation, useUpdateEnquiryMutation } = hmsApi
+export const { useLazyGetAllRolesQuery, useLazyGetSidebarLinksQuery, useLazyGetAllSidebarLinksQuery, useLazyGetSidebarPermissionQuery, useGetSidebarPermissionQuery, usePostRoleSidebarLinkMutation, useCreateRoleMutation, useGetPropertiesQuery, useUpdatePropertiesMutation, useAddPropertyMutation, useAddPropertyBySuperAdminMutation, useGetPropertyFloorsQuery, useLazyGetPropertyFloorsQuery, useBulkUpsertPropertyFloorsMutation, useGetStaffQuery, useGetStaffByIdQuery, useAddStaffMutation, useUpdateStaffMutation, useGetStaffImageQuery, useGetStaffIdProofQuery, useGetStaffByPropertyQuery, useLazyGetStaffByPropertyQuery, useLazyGetStaffByIdQuery, useGetMeQuery, useLazyGetMeQuery, useLazyGetUsersByRoleQuery, useGetAllRolesQuery, useCreateUserMutation, useGetMyPropertiesQuery, useGetRoomsQuery, useBulkUpdateRoomsMutation, useBulkUpsertRoomsMutation, useGetPackageByIdQuery, useGetPackagesByPropertyQuery, useCreatePackageMutation, useUpdatePackageMutation, useDeactivatePackageMutation, useAddRoomMutation, useGetPackagesByUserQuery, useAvailableRoomsQuery, useCreateBookingMutation, useGetPropertyTaxQuery, useGetBookingByIdQuery, useGetBookingsQuery, useCancelBookingMutation, useUpdateBookingMutation, useAddGuestsByBookingMutation, useGetGuestsByBookingQuery, useUpdateGuestsMutation, useAddVehiclesMutation, useGetVehiclesByBookingQuery, useGetPropertyAddressByUserQuery, useGetPaymentsByPropertyQuery, useGetPaymentsByIdQuery, useGetPaymentsByBookingIdQuery, useCreatePaymentMutation, useGetRoomTypesQuery, useUpdateRoomTypesMutation, useLazyGetUsersByPropertyAndRoleQuery, useRoomsStatusQuery, useUpdatePackagesBulkMutation, useGetPropertyBanksQuery, useUpsertPropertyBanksMutation, useGetPropertyVendorsQuery, useCreateVendorMutation, useUpdateVendorMutation, useGetPropertyLaundryPricingQuery, useCreateLaundryPricingMutation, useUpdateLaundryPricingMutation, useGetPropertyLaundryOrdersQuery, useCreateLaundryOrderMutation, useUpdateLaundryOrderMutation, useGetPropertyEnquiriesQuery, useCreateEnquiryMutation, useUpdateEnquiryMutation, useGetAllPropertyVendorsQuery, useTodayInHouseBookingIdsQuery, useGetPropertyMenuQuery, useCreateMenuItemMutation, useUpdateMenuItemMutation, useGetPropertyMenuLightQuery, useGetPropertyOrdersQuery, useGetOrderByIdQuery, useCreateOrderMutation, useUpdateOrderPaymentMutation, useUpdateOrderStatusMutation, useGetRestaurantTableQuery, useCreateRestaurantTableMutation, useUpdateRestaurantTableMutation, useGetRestaurantTablesLightQuery, useGetKitchenInventoryQuery, useCreateInventoryMutation, useUpdateInventoryBulkMutation, useUpdateInventoryMutation, useGetBookingLaundryOrdersQuery, useGetLogsQuery, useGetRoomsByBookingQuery, useGetOrderByBookingQuery, useGetSidebarLinksQuery } = hmsApi

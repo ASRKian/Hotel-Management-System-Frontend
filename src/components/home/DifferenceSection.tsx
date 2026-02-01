@@ -20,7 +20,7 @@ const pillars = [
 
 const DifferenceSection = () => {
   return (
-    <section className="py-20 bg-background">
+    <section className="py-20 bg-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
@@ -35,9 +35,9 @@ const DifferenceSection = () => {
           {pillars.map((pillar, index) => (
             <div
               key={index}
-              className="group text-center p-8 rounded-2xl bg-card border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+              className="group text-center p-8 rounded-[5px] bg-card border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
             >
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6 group-hover:bg-primary/20 transition-colors">
+              <div className="w-16 h-16 rounded-[5px] bg-primary/10 flex items-center justify-center mx-auto mb-6 group-hover:bg-primary/20 transition-colors">
                 <pillar.icon className="h-8 w-8 text-primary" />
               </div>
               <h3 className="text-xl font-bold text-foreground mb-3">{pillar.title}</h3>

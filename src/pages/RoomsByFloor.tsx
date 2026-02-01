@@ -265,7 +265,7 @@ export default function RoomsByFloor() {
                     {(isSuperAdmin || isOwner) && Array.isArray(properties?.properties) && properties?.properties.length > 1 && <div className="mb-4 max-w-sm space-y-2">
                         <Label>Property</Label>
                         <select
-                            className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                            className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                             value={propertyId}
                             onChange={(e) => setPropertyId(e.target.value)}
                         >
@@ -303,7 +303,7 @@ export default function RoomsByFloor() {
                                         <div
                                             key={room.id}
                                             className={cn(
-                                                "aspect-square rounded-xl border border-border p-3 flex flex-col justify-between transition",
+                                                "aspect-square rounded-[3px] border border-border p-3 flex flex-col justify-between transition",
                                                 room.is_active ? "bg-card" : "bg-muted opacity-70"
                                             )}
                                         >
@@ -461,7 +461,7 @@ export default function RoomsByFloor() {
                                             setRoomType("STANDARD");
                                             setOpen(true);
                                         }}
-                                        className="aspect-square rounded-xl border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted transition">
+                                        className="aspect-square rounded-[3px] border border-dashed border-border flex items-center justify-center cursor-pointer hover:bg-muted transition">
                                         <Plus className="h-8 w-8 text-muted-foreground" />
                                     </div>
 
@@ -516,7 +516,7 @@ export default function RoomsByFloor() {
                             <div className="space-y-1">
                                 <label className="text-sm font-medium">Room Category</label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={modalCategory}
                                     onChange={(e) => setModalCategory(e.target.value)}
                                 >
@@ -531,7 +531,7 @@ export default function RoomsByFloor() {
                             <div className="space-y-1">
                                 <label className="text-sm font-medium">Bed Type</label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={modalBed}
                                     onChange={(e) => setModalBed(e.target.value)}
                                 >
@@ -546,7 +546,7 @@ export default function RoomsByFloor() {
                             <div className="space-y-1">
                                 <label className="text-sm font-medium">AC Type</label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={modalAc}
                                     onChange={(e) => setModalAc(e.target.value)}
                                 >

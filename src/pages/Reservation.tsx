@@ -9,11 +9,12 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useAppSelector } from "@/redux/hook";
 import { selectIsOwner, selectIsSuperAdmin } from "@/redux/selectors/auth.selectors";
-import { useAddGuestsByBookingMutation, useAvailableRoomsQuery, useCreateBookingMutation, useGetMyPropertiesQuery, useGetPackageByIdQuery, useGetPackagesByPropertyQuery, useGetPropertyTaxQuery, useUpdateEnquiryMutation } from "@/redux/services/hmsApi";
+import { useAddGuestsByBookingMutation, useAvailableRoomsQuery, useCreateBookingMutation, useGetMyPropertiesQuery, useGetPackageByIdQuery, useGetPackagesByPropertyQuery, useGetPropertyTaxQuery, useGetRoomTypesQuery, useUpdateEnquiryMutation } from "@/redux/services/hmsApi";
 import { normalizeNumberInput, normalizeTextInput } from "@/utils/normalizeTextInput";
 import { toast } from "react-toastify";
 import { useLocation, useNavigate } from "react-router-dom";
 import DatePicker from 'react-datepicker'
+import countries from '../utils/countries.json'
 
 /* -------------------- Types -------------------- */
 type AvailableRoom = {
@@ -52,12 +53,20 @@ const isValidPhone = (phone: string) =>
 
 /* -------------------- Component -------------------- */
 export default function ReservationManagement() {
+
+    const todayISO = () => new Date().toISOString().split("T")[0];
+    const tomorrowISO = () => {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        return d.toISOString().split("T")[0];
+    };
+
     /* -------- Booking Form State -------- */
     const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(null);
     const [packageId, setPackageId] = useState<number | null>(6);
 
-    const [arrivalDate, setArrivalDate] = useState("");
-    const [departureDate, setDepartureDate] = useState("");
+    const [arrivalDate, setArrivalDate] = useState(todayISO());
+    const [departureDate, setDepartureDate] = useState(tomorrowISO());
 
     const [arrivalError, setArrivalError] = useState("");
     const [departureError, setDepartureError] = useState("");
@@ -80,13 +89,22 @@ export default function ReservationManagement() {
         dob: "",
 
         nationality: "",
+        country: "",
+
         address: "",
 
-        guest_type: "",
+        guest_type: "ADULT",
 
-        id_type: "",
+        id_type: "Aadhaar Card",
         id_number: "",
-        has_id_proof: false,
+
+        // for "Other" ID
+        other_id_type: "",
+
+        // visa (foreigner only)
+        visa_number: "",
+        visa_issue_date: "",
+        visa_expiry_date: "",
 
         emergency_contact: "",
         emergency_contact_name: "",
@@ -116,6 +134,15 @@ export default function ReservationManagement() {
     const isSuperAdmin = useAppSelector(selectIsSuperAdmin)
     const isOwner = useAppSelector(selectIsOwner)
     const [idProofFiles, setIdProofFiles] = useState<Record<string, File>>({});
+    const [availableRoomCategory, setAvailableRoomCategory] = useState([])
+    const [availableBedType, setAvailableBedType] = useState([])
+    const [roomFilters, setRoomFilters] = useState({
+        roomCategory: "",
+        bedType: "",
+        acType: "AC",
+        floor: ""
+    })
+    const [floors, setFloors] = useState([])
 
     const enquiryPrefilled = useRef(false);
 
@@ -144,6 +171,10 @@ export default function ReservationManagement() {
 
     const { data: propertyTax } = useGetPropertyTaxQuery(selectedPropertyId, {
         skip: !selectedPropertyId
+    })
+
+    const { data: roomTypes, isLoading: roomTypesLoading, isUninitialized: roomTypesUninitialized } = useGetRoomTypesQuery({ propertyId: selectedPropertyId }, {
+        skip: !isLoggedIn || !selectedPropertyId
     })
 
     const [createBooking, { isLoading: isBooking, data: bookingData, isSuccess: bookingSuccess, isUninitialized: bookingUninitialized, reset }] = useCreateBookingMutation()
@@ -205,9 +236,37 @@ export default function ReservationManagement() {
             { key: "emergency_contact", label: "Emergency contact number" },
         ];
 
+
         for (const field of requiredGuestFields) {
             if (!guest[field.key]?.toString().trim()) {
                 toast.error(`${field.label} is required`);
+                return false;
+            }
+        }
+
+        if (guest.nationality === "foreigner") {
+            if (!guest.country?.trim()) {
+                toast.error("Country is required for foreign guest");
+                return false;
+            }
+
+            if (!guest.visa_number?.trim()) {
+                toast.error("Visa number is required for foreign guest");
+                return false;
+            }
+
+            if (!guest.visa_issue_date) {
+                toast.error("Visa issue date is required");
+                return false;
+            }
+
+            if (!guest.visa_expiry_date) {
+                toast.error("Visa expiry date is required");
+                return false;
+            }
+
+            if (new Date(guest.visa_expiry_date) <= new Date()) {
+                toast.error("Visa is expired");
                 return false;
             }
         }
@@ -243,6 +302,19 @@ export default function ReservationManagement() {
 
     async function submitReservation() {
         if (!validateReservation()) return;
+        if (arrivalDate < todayISO()) {
+            toast.error("arrival day is greater than today")
+            return
+        }
+
+        const acText = `User chose ${roomFilters.acType} room`;
+        let acTypeComment = ""
+        if (!comments || comments.trim() === "") {
+            acTypeComment = acText;
+        } else {
+            acTypeComment = `${comments}\n${acText}`;
+        }
+
 
         const payload = {
             property_id: selectedPropertyId,
@@ -262,7 +334,7 @@ export default function ReservationManagement() {
             price_after_discount: billingDetails.priceBeforeTax - billingDetails.discountAmount,
             gst_amount: billingDetails.gstAmount,
             room_tax_amount: billingDetails.roomTaxAmount,
-            comments,
+            comments: acTypeComment,
             drop,
             pickup
         };
@@ -305,12 +377,20 @@ export default function ReservationManagement() {
         return availableRooms.rooms.map((r: any) => Number(r.id));
     }, [availableRooms]);
 
-    const todayISO = () => new Date().toISOString().split("T")[0];
-    const tomorrowISO = () => {
-        const d = new Date();
-        d.setDate(d.getDate() + 1);
-        return d.toISOString().split("T")[0];
-    };
+    useEffect(() => {
+        if (!availableRooms || !availableRooms.rooms) {
+            setAvailableBedType([])
+            setAvailableRoomCategory([])
+            return
+        }
+
+        const availableRoomCategory = availableRooms.rooms.map((room) => room.room_category_name)
+        const availableBedType = availableRooms.rooms.map((room) => room.bed_type_name)
+        const availableFloors = availableRooms.rooms.map((room) => room.floor_number)
+        setAvailableBedType(() => Array.from(new Set(availableBedType)))
+        setAvailableRoomCategory(() => Array.from(new Set(availableRoomCategory)))
+        setFloors(() => Array.from(new Set(availableFloors)))
+    }, [availableRooms])
 
     useEffect(() => {
         if (!isRoomCountManualChange.current) return;
@@ -332,6 +412,27 @@ export default function ReservationManagement() {
             setRoomCount("");
         }
     }, [selectedPropertyId, arrivalDate, departureDate]);
+
+    useEffect(() => {
+        const updateDatesIfDayChanged = () => {
+            const today = todayISO();
+            const tomorrow = tomorrowISO();
+
+            setArrivalDate(prev => {
+                if (!prev || prev < today) return today;
+                return prev;
+            });
+
+            setDepartureDate(prev => {
+                if (!prev || prev < tomorrow) return tomorrow;
+                return prev;
+            });
+        };
+
+        const interval = setInterval(updateDatesIfDayChanged, 60 * 1000);
+
+        return () => clearInterval(interval);
+    }, []);
 
     const toggleRoom = (roomId: number) => {
         setSelectedRooms((prev) => {
@@ -400,8 +501,14 @@ export default function ReservationManagement() {
     const parseDate = (value?: string) =>
         value ? new Date(value) : null;
 
-    const formatDate = (date: Date | null) =>
-        date ? date.toISOString().slice(0, 10) : "";
+    const formatDate = (date: Date | null) => {
+        if (!date) return "";
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;   // local timezone safe
+    };
+
 
 
     /* -------------------- Effects -------------------- */
@@ -444,17 +551,20 @@ export default function ReservationManagement() {
         const { gst, room_tax_rate } = propertyTax;
 
         const nights = getNights(arrivalDate, departureDate);
-        const roomBaseTotal = selectedRooms.reduce((sum, room) => {
-            return sum + (roomBasePriceMap.get(room.ref_room_id) || 0);
+
+        const selectedRoomTypes = selectedRooms.map((room) => availableRooms?.rooms.find(x => x.id == room.ref_room_id))
+        const roomBaseTotal = selectedRoomTypes.reduce((sum, selRoom) => {
+            const matchedType = roomTypes.find(rt =>
+                rt.room_category_name === selRoom.room_category_name &&
+                rt.bed_type_name === selRoom.bed_type_name &&
+                rt.ac_type_name === roomFilters.acType
+            );
+
+            if (!matchedType) return sum;
+
+            return sum + Number(matchedType.base_price || 0);
         }, 0);
 
-
-        // const priceBeforeTax =
-        //     ((roomBaseTotal || basePrice * selectedRooms.length) + extras * selectedRooms.length)
-        //     * nights;
-
-        // const priceBeforeTax =
-        //     (roomBaseTotal + basePrice + extras * selectedRooms.length) * nights;
         const priceBeforeTax = roomBaseTotal * nights + (basePrice + extras) * nights * +adult
 
         let discountedPrice = priceBeforeTax;
@@ -487,7 +597,8 @@ export default function ReservationManagement() {
         discount,
         discountType,
         editableBasePrice,
-        adult
+        adult,
+        roomFilters.acType
     ]);
 
     useEffect(() => {
@@ -527,7 +638,21 @@ export default function ReservationManagement() {
 
             const formData = new FormData();
 
-            formData.append("guests", JSON.stringify([{ ...guest, guest_type: "ADULT", temp_key: "0" }]));
+            const normalizedGuest = {
+                ...guest,
+                id_type:
+                    guest.id_type === ""
+                        ? guest.other_id_type
+                        : guest.id_type,
+
+                // auto-null visa if not foreigner
+                visa_number: guest.nationality === "foreigner" ? guest.visa_number : null,
+                visa_issue_date: guest.nationality === "foreigner" ? guest.visa_issue_date : null,
+                visa_expiry_date: guest.nationality === "foreigner" ? guest.visa_expiry_date : null,
+            };
+
+
+            formData.append("guests", JSON.stringify([{ ...normalizedGuest, guest_type: "ADULT", temp_key: "0" }]));
 
             const idProofMap: Record<string, number> = {};
             let index = 0;
@@ -540,13 +665,6 @@ export default function ReservationManagement() {
             formData.append("id_proof_map", JSON.stringify(idProofMap));
 
             await createGuest({ formData, bookingId }).unwrap()
-
-            // navigate("/guests", {
-            //     state: {
-            //         bookingId: bookingData?.booking?.id,
-            //         guestCount: bookingData?.booking?.adult
-            //     }
-            // })
             navigate("/bookings")
             reset()
         })()
@@ -610,6 +728,38 @@ export default function ReservationManagement() {
         setIdProofFiles((p) => ({ ...p, [key]: file }));
     };
 
+    function getFloorName(floor: number): string {
+        if (floor === 0) return "G|F";
+
+        const romanMap: { value: number; symbol: string }[] = [
+            { value: 1000, symbol: "M" },
+            { value: 900, symbol: "CM" },
+            { value: 500, symbol: "D" },
+            { value: 400, symbol: "CD" },
+            { value: 100, symbol: "C" },
+            { value: 90, symbol: "XC" },
+            { value: 50, symbol: "L" },
+            { value: 40, symbol: "XL" },
+            { value: 10, symbol: "X" },
+            { value: 9, symbol: "IX" },
+            { value: 5, symbol: "V" },
+            { value: 4, symbol: "IV" },
+            { value: 1, symbol: "I" },
+        ];
+
+        let num = floor;
+        let roman = "";
+
+        for (const { value, symbol } of romanMap) {
+            while (num >= value) {
+                roman += symbol;
+                num -= value;
+            }
+        }
+
+        return `${roman}|F`;
+    }
+
     /* -------------------- UI -------------------- */
     return (
         <div className="min-h-screen bg-background">
@@ -617,10 +767,10 @@ export default function ReservationManagement() {
             <Sidebar />
 
             <main className="lg:ml-64 flex flex-col h-[calc(100vh-3.5rem)] overflow-hidden">
-                <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] flex-1 overflow-hidden">
+                <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] flex-1 overflow-hidden">
 
                     {/* =================== BOOKING FORM =================== */}
-                    <section className="flex-1 overflow-y-auto scrollbar-hide p-6 lg:p-8 border-r border-border">
+                    <section className="flex-1 overflow-y-auto scrollbar-hide p-4 lg:p-4 border-r border-border">
                         <div className="mb-6">
                             <h1 className="text-2xl font-bold text-foreground">New Booking</h1>
                             <p className="text-sm text-muted-foreground mt-1">
@@ -628,307 +778,357 @@ export default function ReservationManagement() {
                             </p>
                         </div>
                         {fromEnquiry && (
-                            <div className="mb-4 rounded-xl bg-blue-50 border border-blue-200 p-3 text-sm text-blue-700">
-                               Creating booking from enquiry
-                                {/* #{enquiry?.id} */}
+                            <div className="mb-4 rounded-[3px] bg-blue-50 border border-blue-200 p-3 text-sm text-blue-700">
+                                Creating booking from enquiry
                             </div>
                         )}
 
-                        <div className="space-y-6">
+                        <div className="space-y-3">
 
-                            {/* Property & Package */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {(isSuperAdmin || isOwner) && < div className="space-y-2">
-                                    <Label>Property</Label>
-                                    <select
-                                        className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                                        value={selectedPropertyId ?? ""}
-                                        onChange={(e) => setSelectedPropertyId(Number(e.target.value) || null)}
-                                        disabled={!(isSuperAdmin || isOwner)}
-                                    >
-                                        <option value="">Select property</option>
-                                        {!myPropertiesLoading &&
-                                            myProperties?.properties?.map((property) => (
-                                                <option key={property.id} value={property.id}>
-                                                    {property.brand_name}
+
+                            <CardSection title="Basic Booking Details" subtitle="Package, stay duration and guests">
+                                <Grid>
+                                    {(isSuperAdmin || isOwner) && <Field label="Property">
+                                        <select
+                                            className="w-full h-10 rounded-[3px] border border-border bg-white px-3 text-sm"
+                                            value={selectedPropertyId ?? ""}
+                                            onChange={(e) => setSelectedPropertyId(Number(e.target.value) || null)}
+                                            disabled={!(isSuperAdmin || isOwner)}
+                                        >
+                                            <option value="">Select property</option>
+                                            {!myPropertiesLoading &&
+                                                myProperties?.properties?.map((property) => (
+                                                    <option key={property.id} value={property.id}>
+                                                        {property.brand_name}
+                                                    </option>
+                                                ))}
+                                        </select>
+                                    </Field>}
+                                    <Field label="Package">
+                                        <select
+                                            className="w-full h-10 rounded-[3px] border border-border bg-white px-3 text-sm"
+                                            value={packageId ?? ""}
+                                            onChange={(e) => setPackageId(Number(e.target.value) || null)}
+                                            disabled={!selectedPropertyId}
+                                        >
+                                            <option value="">Select package</option>
+                                            {!packageUninitialized && !packagesLoading && packages?.packages.map((pkg) => (
+                                                <option key={pkg.id} value={pkg.id}>
+                                                    {pkg.package_name}
                                                 </option>
                                             ))}
-                                    </select>
-                                </div>}
-
-                                <div className="space-y-2">
-                                    <Label>Package</Label>
-                                    <select
-                                        className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                                        value={packageId ?? ""}
-                                        onChange={(e) => setPackageId(Number(e.target.value) || null)}
-                                        disabled={!selectedPropertyId}
-                                    >
-                                        <option value="">Select package</option>
-                                        {!packageUninitialized && !packagesLoading && packages?.packages.map((pkg) => (
-                                            <option key={pkg.id} value={pkg.id}>
-                                                {pkg.package_name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* first and last name */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>First Name*</Label>
-                                    <Input disabled={isBooking} value={guest.first_name} onChange={(e) => setGuest(prev => ({ ...prev, first_name: normalizeTextInput(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Last Name</Label>
-                                    <Input disabled={isBooking} value={guest.last_name} onChange={(e) => setGuest(prev => ({ ...prev, last_name: normalizeTextInput(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Gender*</Label>
-                                    <select
-                                        className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                                        value={guest.gender}
-                                        onChange={(e) => setGuest(prev => ({ ...prev, gender: e.target.value }))}
-                                        disabled={!selectedPropertyId}
-                                    >
-                                        <option value="" disabled>Select gender</option>
-                                        <option value={"MALE"}>Male</option>
-                                        <option value={"FEMALE"}>Female</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Date of birth</Label>
-                                    <DatePicker
-                                        selected={parseDate(guest.dob)}
-                                        placeholderText="dd-MM-yyyy"
-                                        onChange={(date) => {
-                                            setGuest(prev => ({ ...prev, dob: formatDate(date) }))
-                                        }}
-                                        // onChangeRaw={(e) => e.preventDefault()}
-                                        dateFormat="dd-MM-yyyy"
-                                        // maxDate={toDate ? new Date(toDate) : undefined}
-                                        customInput={
-                                            <Input readOnly />
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Phone*</Label>
-                                    <Input disabled={isBooking} value={guest.phone} onChange={(e) => e.target.value.length <= 10 && setGuest(prev => ({ ...prev, phone: normalizeTextInput(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Email*</Label>
-                                    <Input disabled={isBooking} value={guest.email} onChange={(e) => setGuest(prev => ({ ...prev, email: normalizeTextInput(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Nationality*</Label>
-                                    <Input disabled={isBooking} value={guest.nationality} onChange={(e) => setGuest(prev => ({ ...prev, nationality: normalizeTextInput(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Address*</Label>
-                                    <Input disabled={isBooking} value={guest.address} onChange={(e) => setGuest(prev => ({ ...prev, address: normalizeTextInput(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>ID Type*</Label>
-                                    <Input disabled={isBooking} value={guest.id_type} onChange={(e) => setGuest(prev => ({ ...prev, id_type: normalizeTextInput(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>ID Number*</Label>
-                                    <Input disabled={isBooking} value={guest.id_number} onChange={(e) => setGuest(prev => ({ ...prev, id_number: normalizeTextInput(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>ID Proof*</Label>
-                                    <Input
-                                        disabled={isBooking}
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) =>
-                                            handleFile("0", e.target.files?.[0])
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Emergency Contact Name*</Label>
-                                    <Input disabled={isBooking} value={guest.emergency_contact_name} onChange={(e) => setGuest(prev => ({ ...prev, emergency_contact_name: normalizeTextInput(e.target.value) }))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Emergency Contact Number*</Label>
-                                    <Input disabled={isBooking} value={guest.emergency_contact} onChange={(e) => e.target.value.length <= 10 && setGuest(prev => ({ ...prev, emergency_contact: normalizeTextInput(e.target.value) }))} />
-                                </div>
-                            </div>
-
-                            {/* Dates */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Arrival Date</Label>
-                                    {/* <Input disabled={isBooking} type="date" value={arrivalDate} min={todayISO()} onChange={(e) => handleArrivalChange(e.target.value)} /> */}
-                                    <DatePicker
-                                        selected={parseDate(arrivalDate)}
-                                        placeholderText="dd-mm-yyyy"
-                                        onChange={(date) => {
-                                            handleArrivalChange(formatDate(date));
-                                        }}
-                                        minDate={parseDate(todayISO())}
-                                        // onChangeRaw={(e) => e.preventDefault()}
-                                        dateFormat="dd-MM-yyyy"
-                                        // maxDate={toDate ? new Date(toDate) : undefined}
-                                        customInput={
-                                            <Input readOnly />
-                                        }
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Departure Date</Label>
-                                    {/* <Input type="date" disabled={!arrivalDate || isBooking} value={departureDate} min={nextDay(arrivalDate) || todayISO()} onChange={(e) => handleDepartureChange(e.target.value)} /> */}
-                                    <DatePicker
-                                        selected={parseDate(departureDate)}
-                                        placeholderText="dd-mm-yyyy"
-                                        onChange={(date) => {
-                                            handleDepartureChange(formatDate(date));
-                                        }}
-                                        onChangeRaw={(e) => e.preventDefault()}
-                                        dateFormat="dd-MM-yyyy"
-                                        minDate={parseDate(nextDay(arrivalDate) || todayISO())}
-                                        disabled={!arrivalDate}
-                                        customInput={
-                                            <Input readOnly />
-                                        }
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Guests */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Adults</Label>
-                                    <Input disabled={isBooking} type="number" min={1} value={adult} onChange={(e) => setAdult(normalizeNumberInput(e.target.value))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Children</Label>
-                                    <Input disabled={isBooking} type="number" min={0} value={child} onChange={(e) => setChild(normalizeNumberInput(e.target.value))} />
-                                </div>
-                            </div>
-
-                            {/* extras and advanced payment */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Extras per night</Label>
-                                    <Input disabled={isBooking} type="number" min={0} value={extraPerNight} onChange={(e) => setExtraPerNight(normalizeNumberInput(e.target.value))} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Advance Payment</Label>
-                                    <Input disabled={isBooking} type="number" min={0} value={advancePayment} onChange={(e) => setAdvancePayment(normalizeNumberInput(e.target.value))} />
-                                </div>
-                            </div>
-
-
-                            {/* Discount */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Discount Type</Label>
-                                    <select
-                                        className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                                        value={discountType}
-                                        onChange={(e) => setDiscountType(e.target.value as any)}
-                                    >
-                                        <option value="PERCENT">Percent (%)</option>
-                                        <option value="FLAT">Flat</option>
-                                    </select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Discount</Label>
-                                    <Input type="number" disabled={isBooking} min={0} value={discount} onChange={(e) => setDiscount(normalizeNumberInput(e.target.value))} />
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={pickup}
-                                        onCheckedChange={setPickup}
-                                    />
-                                    <Label>{"Pickup"}</Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Switch
-                                        checked={drop}
-                                        onCheckedChange={setDrop}
-                                    />
-                                    <Label>{"Drop"}</Label>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Comments</Label>
-                                <textarea
-                                    className="w-full min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                                    value={comments}
-                                    onChange={(e) => setComments(normalizeTextInput(e.target.value))}
-                                />
-                            </div>
-
-                            {
-                                <div className="mb-6 rounded-xl border border-border bg-card p-4 space-y-3">
-                                    <h3 className="text-sm font-semibold text-foreground">
-                                        Billing Summary
-                                    </h3>
-
-                                    <div className="space-y-1 text-sm">
-                                        {/* <div className="flex justify-between items-center text-muted-foreground gap-2">
-                                            <span>Package Base Price</span>
-
-                                            <div className="flex items-center gap-1">
-                                                <span>₹</span>
-                                                <Input
-                                                    type="number"
-                                                    className="w-24 h-8 text-right"
-                                                    min={0}
-                                                    value={editableBasePrice}
-                                                    onChange={(e) =>
-                                                        setEditableBasePrice(normalizeNumberInput(e.target.value))
-                                                    }
-                                                />
-                                            </div>
-                                        </div> */}
-                                        <div className="flex justify-between text-muted-foreground">
-                                            <span>Package Price</span>
-                                            <span>₹{packageData?.data?.base_price || 0}</span>
+                                        </select>
+                                    </Field>
+                                    <Field label="AC Type">
+                                        <select
+                                            className="w-full h-10 rounded-[3px] border border-border bg-white px-3 text-sm"
+                                            value={roomFilters.acType}
+                                            onChange={(e) => setRoomFilters({ ...roomFilters, acType: e.target.value })}
+                                        >
+                                            <option value="AC" >AC</option>
+                                            <option value="Non-AC" >Non-AC</option>
+                                        </select>
+                                    </Field>
+                                    <Field label="Arrival Date*">
+                                        <div className="block">
+                                            <DatePicker
+                                                className="bg-white"
+                                                selected={parseDate(arrivalDate)}
+                                                placeholderText="dd-mm-yyyy"
+                                                onChange={(date) => {
+                                                    handleArrivalChange(formatDate(date));
+                                                }}
+                                                minDate={parseDate(todayISO())}
+                                                // onChangeRaw={(e) => e.preventDefault()}
+                                                dateFormat="dd-MM-yyyy"
+                                                // maxDate={toDate ? new Date(toDate) : undefined}
+                                                customInput={
+                                                    <Input readOnly />
+                                                }
+                                            />
                                         </div>
-
-
-                                        <div className="flex justify-between text-muted-foreground">
-                                            <span>Extra per night</span>
-                                            <span>₹{extraPerNight || 0}</span>
+                                    </Field>
+                                    <Field label="Departure Date*">
+                                        <div className="block">
+                                            <DatePicker
+                                                className="bg-white"
+                                                selected={parseDate(departureDate)}
+                                                placeholderText="dd-mm-yyyy"
+                                                onChange={(date) => {
+                                                    handleDepartureChange(formatDate(date));
+                                                }}
+                                                onChangeRaw={(e) => e.preventDefault()}
+                                                dateFormat="dd-MM-yyyy"
+                                                minDate={parseDate(nextDay(arrivalDate) || todayISO())}
+                                                disabled={!arrivalDate}
+                                                customInput={
+                                                    <Input readOnly />
+                                                }
+                                            />
                                         </div>
+                                    </Field>
+                                    <Field label="Adults">
+                                        <Input className="bg-white" disabled={isBooking} type="number" min={1} value={adult} onChange={(e) => setAdult(normalizeNumberInput(e.target.value))} />
+                                    </Field>
+                                    <Field label="Children">
+                                        <Input disabled={isBooking} className="bg-white" type="number" min={0} value={child} onChange={(e) => setChild(normalizeNumberInput(e.target.value))} />
+                                    </Field>
+                                </Grid>
+                            </CardSection>
 
-                                        <div className="flex justify-between text-muted-foreground">
-                                            <span>Total Base Price</span>
-                                            <span>₹{billingDetails.priceBeforeTax.toFixed(2)}</span>
+                            <CardSection title="Guest Personal Information" subtitle="Primary guest identity">
+                                <Grid>
+                                    <Field label="First Name*">
+                                        <Input className="bg-white" disabled={isBooking} value={guest.first_name} onChange={(e) => setGuest(prev => ({ ...prev, first_name: normalizeTextInput(e.target.value) }))} />
+                                    </Field>
+                                    <Field label="Last Name">
+                                        <Input className="bg-white" disabled={isBooking} value={guest.last_name} onChange={(e) => setGuest(prev => ({ ...prev, last_name: normalizeTextInput(e.target.value) }))} />
+                                    </Field>
+                                    <Field label="Gender*">
+                                        <select
+                                            className="w-full h-10 rounded-[3px] border border-border bg-white px-3 text-sm"
+                                            value={guest.gender}
+                                            onChange={(e) => setGuest(prev => ({ ...prev, gender: e.target.value }))}
+                                            disabled={!selectedPropertyId}
+                                        >
+                                            <option value="" disabled>Select gender</option>
+                                            <option value={"MALE"}>Male</option>
+                                            <option value={"FEMALE"}>Female</option>
+                                        </select>
+                                    </Field>
+                                    <Field label="Date of birth*">
+                                        <div className="block">
+                                            <DatePicker
+                                                className="bg-white"
+                                                selected={parseDate(guest.dob)}
+                                                placeholderText="dd-MM-yyyy"
+                                                onChange={(date) => {
+                                                    setGuest(prev => ({ ...prev, dob: formatDate(date) }))
+                                                }}
+                                                // onChangeRaw={(e) => e.preventDefault()}
+                                                dateFormat="dd-MM-yyyy"
+                                                // maxDate={toDate ? new Date(toDate) : undefined}
+                                                customInput={
+                                                    <Input readOnly />
+                                                }
+                                            />
                                         </div>
+                                    </Field>
+                                    <Field label="Nationality*">
+                                        <select
+                                            className="w-full h-10 rounded-[3px] border border-border bg-white px-3 text-sm"
+                                            value={guest.nationality}
+                                            onChange={(e) => setGuest(prev => ({ ...prev, nationality: e.target.value }))}
+                                        >
+                                            <option value="">Select nationality</option>
+                                            <option value="indian">Indian</option>
+                                            <option value="non_res_indian">Non Resident Indian</option>
+                                            <option value="foreigner">Foreigner</option>
+                                        </select>
+                                    </Field>
+                                    {guest.nationality === "foreigner" &&
+                                        <Field label="Country*">
+                                            <select
+                                                className="w-full h-10 rounded-[3px] border border-border bg-white px-3 text-sm"
+                                                value={guest.country || ""}
+                                                onChange={(e) => setGuest(prev => ({ ...prev, country: e.target.value }))}
+                                            >
+                                                {
+                                                    countries.map((country, i) => {
+                                                        return <option value={country} key={i}>{country}</option>
+                                                    })
+                                                }
 
-                                        <div className="flex justify-between text-muted-foreground">
-                                            <span>Discount</span>
-                                            <span>- ₹{billingDetails.discountAmount.toFixed(2)}</span>
-                                        </div>
+                                            </select>
+                                        </Field>}
+                                    <Field label="Phone*">
+                                        <Input className="bg-white" disabled={isBooking} value={guest.phone} onChange={(e) => e.target.value.length <= 10 && setGuest(prev => ({ ...prev, phone: normalizeTextInput(e.target.value) }))} />
+                                    </Field>
+                                    <Field label="Email*">
+                                        <Input className="bg-white" disabled={isBooking} value={guest.email} onChange={(e) => setGuest(prev => ({ ...prev, email: normalizeTextInput(e.target.value) }))} />
+                                    </Field>
+                                </Grid>
+                            </CardSection>
 
-                                        <div className="flex justify-between text-muted-foreground">
-                                            <span>GST</span>
-                                            <span>{propertyTax?.gst}% (₹{billingDetails.gstAmount.toFixed(2)})</span>
-                                        </div>
+                            <CardSection title="Address & Identification" subtitle="Verification details">
+                                <Grid>
+                                    <Field label="Address*">
+                                        <Input className="bg-white" disabled={isBooking} value={guest.address} onChange={(e) => setGuest(prev => ({ ...prev, address: normalizeTextInput(e.target.value) }))} />
+                                    </Field>
+                                    <Field label="ID Type*">
+                                        <select
+                                            className="w-full h-10 rounded-[3px] border border-border bg-white px-3 text-sm"
+                                            value={guest.id_type || (guest.other_id_type ? "Other" : "")}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (value === "Other") {
+                                                    setGuest(prev => ({ ...prev, id_type: "" }));
+                                                } else {
+                                                    setGuest(prev => ({ ...prev, id_type: value, other_id_type: "" }));
+                                                }
+                                            }}
+                                        >
+                                            <option value="Aadhaar Card">Aadhaar Card</option>
+                                            <option value="APAAR Id">APAAR Id</option>
+                                            <option value="Driving License">Driving License</option>
+                                            <option value="PAN Card">PAN Card</option>
+                                            <option value="Passport">Passport</option>
+                                            <option value="Voter ID">Voter ID</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </Field>
+                                    {guest.id_type === "" && <Field label="Other Id type*">
+                                        <Input
+                                            className="bg-white"
+                                            placeholder="Enter ID proof type"
+                                            value={guest.other_id_type}
+                                            onChange={(e) =>
+                                                setGuest(prev => ({ ...prev, other_id_type: normalizeTextInput(e.target.value) }))
+                                            }
+                                        />
+                                    </Field>}
+                                    <Field label="ID Number*">
+                                        <Input className="bg-white" disabled={isBooking} value={guest.id_number} onChange={(e) => setGuest(prev => ({ ...prev, id_number: normalizeTextInput(e.target.value) }))} />
+                                    </Field>
+                                    <Field label="ID Proof*">
+                                        <Input
+                                            className="bg-white"
+                                            disabled={isBooking}
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) =>
+                                                handleFile("0", e.target.files?.[0])
+                                            }
+                                        />
+                                    </Field>
 
-                                        <div className="flex justify-between text-muted-foreground">
-                                            <span>Room Tax</span>
-                                            <span>{propertyTax?.room_tax_rate}% (₹{billingDetails.roomTaxAmount.toFixed(2)})</span>
-                                        </div>
+
+                                    {/* Foreigner Only */}
+                                    {guest.nationality === "foreigner" && <>
+                                        <Field label="Visa Number*">
+                                            <Input
+                                                className="bg-white"
+                                                placeholder="Visa Number"
+                                                value={guest.visa_number}
+                                                onChange={(e) => setGuest(prev => ({ ...prev, visa_number: e.target.value }))}
+                                            />
+
+                                        </Field>
+                                        <Field label="Visa Issue Date*">
+                                            <DatePicker
+                                                className="bg-white"
+                                                placeholderText="dd-mm-yyyy"
+                                                selected={parseDate(guest.visa_issue_date)}
+                                                onChange={(d) => setGuest(prev => ({ ...prev, visa_issue_date: formatDate(d) }))}
+                                                customInput={<Input readOnly />}
+                                            />
+                                        </Field>
+                                        <Field label="Visa Expiry Date*">
+                                            <DatePicker
+                                                className="bg-white"
+                                                placeholderText="dd-mm-yyyy"
+                                                selected={parseDate(guest.visa_expiry_date)}
+                                                onChange={(d) => setGuest(prev => ({ ...prev, visa_expiry_date: formatDate(d) }))}
+                                                customInput={<Input readOnly />}
+                                            />
+                                        </Field>
+                                    </>}
+                                </Grid>
+                            </CardSection>
+
+                            <CardSection title="Emergency Contact" subtitle="For safety and compliance">
+                                <Grid cols={2}>
+                                    <Field label="Emergency Contact Name*">
+                                        <Input className="bg-white" disabled={isBooking} value={guest.emergency_contact_name} onChange={(e) => setGuest(prev => ({ ...prev, emergency_contact_name: normalizeTextInput(e.target.value) }))} />
+                                    </Field>
+                                    <Field label="Emergency Contact Number*">
+                                        <Input className="bg-white" disabled={isBooking} value={guest.emergency_contact} onChange={(e) => e.target.value.length <= 10 && setGuest(prev => ({ ...prev, emergency_contact: normalizeTextInput(e.target.value) }))} />
+                                    </Field>
+                                </Grid>
+                            </CardSection>
+
+                            <CardSection title="Booking Add-ons" subtitle="Extra services">
+                                <Grid cols={2}>
+                                    <Field label="Extras Per Night">
+                                        <Input className="bg-white" disabled={isBooking} type="number" min={0} value={extraPerNight} onChange={(e) => setExtraPerNight(normalizeNumberInput(e.target.value))} />
+                                    </Field>
+                                    <Field label="Advance Payment">
+                                        <Input className="bg-white" disabled={isBooking} type="number" min={0} value={advancePayment} onChange={(e) => setAdvancePayment(normalizeNumberInput(e.target.value))} />
+                                    </Field>
+
+
+                                    <Toggle label="Pickup" checked={pickup} onChange={setPickup} />
+                                    <Toggle label="Drop" checked={drop} onChange={setDrop} />
+                                </Grid>
+                            </CardSection>
+
+                            <CardSection title="Discount & Special Request" subtitle="Offers and notes">
+                                <Grid cols={2}>
+                                    <Field label="Discount Type">
+                                        <select
+                                            className="w-full h-10 rounded-[3px] border border-border bg-white px-3 text-sm"
+                                            value={discountType}
+                                            onChange={(e) => setDiscountType(e.target.value as any)}
+                                        >
+                                            <option value="PERCENT">Percent (%)</option>
+                                            <option value="FLAT">Flat</option>
+                                        </select>
+                                    </Field>
+                                    <Field label="Discount">
+                                        <Input className="bg-white" type="number" disabled={isBooking} min={0} value={discount} onChange={(e) => setDiscount(normalizeNumberInput(e.target.value))} />
+                                    </Field>
+                                </Grid>
+
+
+                                <Field label="Comments">
+                                    <textarea
+                                        className="w-full min-h-[96px] rounded-[3px] border border-border bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                        value={comments}
+                                        onChange={(e) => setComments(normalizeTextInput(e.target.value))}
+                                    />
+                                </Field>
+                            </CardSection>
+
+                            <CardSection title="Billing Summary" subtitle={""}>
+                                <div className="space-y-1 text-sm">
+                                    <div className="flex justify-between text-muted-foreground">
+                                        <span>Package Price</span>
+                                        <span>₹{packageData?.data?.base_price || 0}</span>
                                     </div>
 
-                                    <div className="pt-3 border-t border-border flex justify-between font-semibold text-foreground">
-                                        <span>Total Payable</span>
-                                        <span>₹{billingDetails.priceAfterTax.toFixed(2)}</span>
+
+                                    <div className="flex justify-between text-muted-foreground">
+                                        <span>Extra per night</span>
+                                        <span>₹{extraPerNight || 0}</span>
+                                    </div>
+
+                                    <div className="flex justify-between text-muted-foreground">
+                                        <span>Total Base Price</span>
+                                        <span>₹{billingDetails.priceBeforeTax.toFixed(2)}</span>
+                                    </div>
+
+                                    <div className="flex justify-between text-muted-foreground">
+                                        <span>Discount</span>
+                                        <span>- ₹{billingDetails.discountAmount.toFixed(2)}</span>
+                                    </div>
+
+                                    <div className="flex justify-between text-muted-foreground">
+                                        <span>GST</span>
+                                        <span>{propertyTax?.gst}% (₹{billingDetails.gstAmount.toFixed(2)})</span>
+                                    </div>
+
+                                    <div className="flex justify-between text-muted-foreground">
+                                        <span>Room Tax</span>
+                                        <span>{propertyTax?.room_tax_rate}% (₹{billingDetails.roomTaxAmount.toFixed(2)})</span>
                                     </div>
                                 </div>
-                            }
 
+
+                                <div className="pt-3 border-t border-border flex justify-between font-semibold text-foreground">
+                                    <span>Total Payable</span>
+                                    <span>₹{billingDetails.priceAfterTax.toFixed(2)}</span>
+                                </div>
+                            </CardSection>
 
                             {/* Submit */}
                             <div className="pt-4 border-t border-border flex justify-end">
@@ -946,34 +1146,61 @@ export default function ReservationManagement() {
                     </section>
 
                     {/* =================== AVAILABLE ROOMS =================== */}
-                    <section className="flex-1 overflow-y-auto scrollbar-hide p-6 lg:p-8 bg-muted/20">
+                    <section className="flex-1 overflow-y-auto scrollbar-hide p-6 lg:p-3 bg-muted/20">
 
                         <h2 className="text-lg font-semibold text-foreground mb-4">
                             Available Rooms
                         </h2>
 
-                        <div className="space-y-2 mb-4">
-                            <Label>Select Number of Rooms</Label>
-                            <select
-                                className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
-                                value={roomCount}
-                                onChange={(e) => {
-                                    isRoomCountManualChange.current = true;
-                                    setRoomCount(e.target.value ? Number(e.target.value) : "");
-                                }}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-3">
+                            <div className="space-y-1 mb-4">
+                                <select
+                                    className="w-full h-10 rounded-[3px] border border-border bg-white px-3 text-sm"
+                                    value={roomFilters.bedType}
+                                    onChange={(e) => {
+                                        setRoomFilters({ ...roomFilters, bedType: e.target.value })
+                                    }}
 
-                                disabled={allAvailableRoomIds.length === 0}
-                            >
-                                <option value="">Select rooms</option>
-                                {Array.from(
-                                    { length: allAvailableRoomIds.length },
-                                    (_, i) => i + 1
-                                ).map((count) => (
-                                    <option key={count} value={count}>
-                                        {count}
-                                    </option>
-                                ))}
-                            </select>
+                                    disabled={allAvailableRoomIds.length === 0}
+                                >
+                                    <option value="">Select Bed type</option>
+                                    {availableBedType.map((type, i) => {
+                                        return <option value={type} key={i}>{type}</option>
+                                    })}
+                                </select>
+                            </div>
+                            <div className="space-y-1 mb-4">
+                                <select
+                                    className="w-full h-10 rounded-[3px] border border-border bg-white px-3 text-sm"
+                                    value={roomFilters.roomCategory}
+                                    onChange={(e) => {
+                                        setRoomFilters({ ...roomFilters, roomCategory: e.target.value })
+                                    }}
+
+                                    disabled={allAvailableRoomIds.length === 0}
+                                >
+                                    <option value="">Select category</option>
+                                    {availableRoomCategory.map((category, i) => {
+                                        return <option value={category} key={i}>{category}</option>
+                                    })}
+                                </select>
+                            </div>
+                            <div className="space-y-1 mb-4">
+                                <select
+                                    className="w-full h-10 rounded-[3px] border border-border bg-white px-3 text-sm"
+                                    value={roomFilters.floor}
+                                    onChange={(e) => {
+                                        setRoomFilters({ ...roomFilters, floor: e.target.value })
+                                    }}
+
+                                    disabled={floors.length === 0}
+                                >
+                                    <option value="">Select floor</option>
+                                    {floors.map((floor, i) => {
+                                        return <option value={floor} key={i}>{floor}</option>
+                                    })}
+                                </select>
+                            </div>
                         </div>
 
 
@@ -983,41 +1210,52 @@ export default function ReservationManagement() {
                             </p>
                         )}
 
-                        <div className="space-y-6">
+                        <div className="space-y-3">
                             {roomsByFloor.map(({ floor, rooms }) => (
-                                <div key={floor}>
+                                (roomFilters.floor === "" || roomFilters.floor == floor.toString()) && <div key={floor}>
                                     <h3 className="text-sm font-medium text-muted-foreground mb-3">
                                         Floor {floor}
                                     </h3>
 
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-2">
                                         {rooms.map((room) => {
                                             const isSelected = selectedRooms.some(
                                                 (r) => r.ref_room_id === Number(room.id)
                                             );
 
                                             return (
+                                                (isSelected ||
+                                                    ((!roomFilters.bedType || room.bed_type_name === roomFilters.bedType) &&
+                                                        (!roomFilters.roomCategory || room.room_category_name === roomFilters.roomCategory))) &&
                                                 <button
                                                     key={room.id}
                                                     onClick={() => toggleRoom(Number(room.id))}
                                                     className={cn(
-                                                        "aspect-square rounded-xl border p-3 text-sm font-semibold transition",
+                                                        "h-[110px] rounded-[3px] border p-3 text-sm font-semibold transition",
                                                         isSelected
                                                             ? "bg-primary text-primary-foreground border-primary"
                                                             : "bg-card border-border hover:bg-muted"
                                                     )}
                                                 >
-                                                    <div className="flex flex-col items-center justify-center h-full">
-                                                        <span>{room.room_no}</span>
-                                                        <span className="text-xs opacity-70">
-                                                            {room.room_category_name}
+                                                    <div className="flex flex-col h-full">
+
+                                                        {/* Top - Left */}
+                                                        <span className="text-xs opacity-70 mb-4 text-left">
+                                                            {getFloorName(room.floor_number)}
                                                         </span>
-                                                        <span className="text-xs opacity-70">
-                                                            {room.ac_type_name}
+
+                                                        {/* Middle - Center */}
+                                                        <div className="flex-1 flex items-center justify-center">
+                                                            <span className="text-[2rem] font-semibold">
+                                                                {room.room_no}
+                                                            </span>
+                                                        </div>
+
+                                                        {/* Bottom - Left */}
+                                                        <span className="text-xs opacity-70 mt-4 text-left">
+                                                            {room.bed_type_name.split(" ")[0]}|{room.room_category_name}
                                                         </span>
-                                                        <span className="text-xs opacity-70">
-                                                            {room.bed_type_name.slice(0, 8)}
-                                                        </span>
+
                                                     </div>
                                                 </button>
                                             );
@@ -1033,3 +1271,36 @@ export default function ReservationManagement() {
         </div >
     );
 }
+
+const CardSection = ({ title, subtitle, children }) => (
+    <div className="rounded-[5px] border border-border bg-card p-5 shadow-sm">
+        <div className="mb-4">
+            <h3 className="text-base font-semibold text-foreground">{title}</h3>
+            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+        </div>
+        {children}
+    </div>
+);
+
+
+const Grid = ({ cols = 2, children }) => (
+    <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-${cols} gap-4`}>
+        {children}
+    </div>
+);
+
+
+const Field = ({ label, children }) => (
+    <div className="space-y-1">
+        <Label className="text-xs font-medium">{label}</Label>
+        {children}
+    </div>
+);
+
+
+const Toggle = ({ label, checked, onChange }) => (
+    <div className="flex items-center gap-3 mt-2">
+        <Switch checked={checked} onCheckedChange={onChange} />
+        <Label className="text-sm">{label}</Label>
+    </div>
+);

@@ -242,7 +242,7 @@ export default function LaundryPricingManagement() {
                             <Label>Properties</Label>
 
                             <select
-                                className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                 value={selectedPropertyId}
                                 onChange={(e) => setSelectedPropertyId(e.target.value)}
                             >
@@ -260,7 +260,7 @@ export default function LaundryPricingManagement() {
                         </div>
                     </div>}
                     {/* Table */}
-                    <div className="bg-card border rounded-2xl overflow-hidden">
+                    <div className="bg-card border rounded-[5px] overflow-hidden">
                         <Table>
                             <TableHeader>
                                 <TableRow>

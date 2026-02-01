@@ -32,6 +32,7 @@ export type GuestForm = {
     dob?: string;
 
     nationality?: string;
+    country?: string;
     address?: string;
 
     guest_type?: "ADULT" | "CHILD";
@@ -42,6 +43,10 @@ export type GuestForm = {
 
     emergency_contact?: string;
     emergency_contact_name?: string;
+
+    visa_number?: string;
+    visa_issue_date?: string;
+    visa_expiry_date?: string;
 };
 
 type Props = {
@@ -52,8 +57,14 @@ type Props = {
 const parseDate = (value?: string) =>
     value ? new Date(value) : null;
 
-const formatDate = (date: Date | null) =>
-    date ? date.toISOString().slice(0, 10) : "";
+const formatDate = (date: Date | null) => {
+    if (!date) return "";
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;   // local timezone safe
+};
+
 
 /* ---------------- Component ---------------- */
 export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
@@ -129,6 +140,16 @@ export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
             toast.error("First name is required for all guests");
             return false;
         }
+
+        for (const g of guests) {
+            if (g.nationality?.toLowerCase() === "foreigner") {
+                if (!g.visa_number || !g.visa_issue_date || !g.visa_expiry_date) {
+                    toast.error("Visa details required for foreign guests");
+                    return false;
+                }
+            }
+        }
+
         return true;
     };
 
@@ -178,6 +199,25 @@ export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
             month: "2-digit",
             year: "numeric",
         });
+    };
+
+    const downloadImage = async (url: string) => {
+        try {
+            const res = await fetch(url);
+            const blob = await res.blob();
+
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = blobUrl;
+            a.download = "id-proof.jpg";
+            document.body.appendChild(a);
+            a.click();
+
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error("Download failed", err);
+        }
     };
 
     /* -------- UI -------- */
@@ -233,7 +273,7 @@ export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
                 return (
                     <div
                         key={key}
-                        className="rounded-2xl border bg-card p-6 space-y-4"
+                        className="rounded-[5px] border bg-card p-6 space-y-4"
                     >
                         <div className="flex justify-between">
                             <p className="font-medium">
@@ -304,7 +344,7 @@ export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
                                 <select
                                     disabled={!isEditing}
                                     tabIndex={isEditing ? 0 : -1}
-                                    className="h-10 w-full rounded-xl border px-3 text-sm"
+                                    className="h-10 w-full rounded-[3px] border px-3 text-sm"
                                     value={g.gender ?? ""}
                                     onChange={(e) =>
                                         updateGuest(index, {
@@ -371,16 +411,33 @@ export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
                         </div>
 
                         {/* Address */}
-                        <div className="grid sm:grid-cols-2 gap-4">
+                        <div className="grid sm:grid-cols-3 gap-4">
                             <div className="space-y-1">
                                 <Label>Nationality</Label>
-                                <Input
-                                    readOnly={!isEditing}
-                                    tabIndex={isEditing ? 0 : -1}
+                                <select
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={g.nationality ?? ""}
                                     onChange={(e) =>
                                         updateGuest(index, {
                                             nationality: normalizeTextInput(e.target.value),
+                                        })
+                                    }
+                                >
+                                    <option value="">Select nationality</option>
+                                    <option value="indian">Indian</option>
+                                    <option value="non_res_indian">Non Resident Indian</option>
+                                    <option value="foreigner">Foreigner</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-1">
+                                <Label>Country</Label>
+                                <Input
+                                    readOnly={!isEditing}
+                                    value={g.country ?? ""}
+                                    onChange={(e) =>
+                                        updateGuest(index, {
+                                            country: normalizeTextInput(e.target.value),
                                         })
                                     }
                                 />
@@ -390,7 +447,6 @@ export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
                                 <Label>Address</Label>
                                 <Input
                                     readOnly={!isEditing}
-                                    tabIndex={isEditing ? 0 : -1}
                                     value={g.address ?? ""}
                                     onChange={(e) =>
                                         updateGuest(index, {
@@ -400,6 +456,7 @@ export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
                                 />
                             </div>
                         </div>
+
 
                         {/* ID */}
                         <div className="grid sm:grid-cols-3 gap-4">
@@ -444,6 +501,60 @@ export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
                                 />
                             </div>
                         </div>
+
+                        {g.nationality?.toLowerCase() === "foreigner" && (
+
+                            <div className="grid sm:grid-cols-3 gap-4">
+                                <div className="space-y-1">
+                                    <Label>Visa Number *</Label>
+                                    <Input
+                                        readOnly={!isEditing}
+                                        value={g.visa_number ?? ""}
+                                        onChange={(e) =>
+                                            updateGuest(index, {
+                                                visa_number: normalizeTextInput(e.target.value),
+                                            })
+                                        }
+                                    />
+                                </div>
+
+                                <div className="space-y-1">
+                                    <Label>Issue Date *</Label>
+                                    <div className="block">
+                                        <DatePicker
+                                            readOnly={!isEditing}
+                                            selected={parseDate(g.visa_issue_date)}
+                                            placeholderText="dd-MM-yyyy"
+                                            onChange={(date) =>
+                                                updateGuest(index, {
+                                                    visa_issue_date: formatDate(date),
+                                                })
+                                            }
+                                            dateFormat="dd-MM-yyyy"
+                                            customInput={<Input readOnly />}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <Label>Expiry Date *</Label>
+                                    <div className="block">
+                                        <DatePicker
+                                            readOnly={!isEditing}
+                                            selected={parseDate(g.visa_expiry_date)}
+                                            placeholderText="dd-MM-yyyy"
+                                            onChange={(date) =>
+                                                updateGuest(index, {
+                                                    visa_expiry_date: formatDate(date),
+                                                })
+                                            }
+                                            dateFormat="dd-MM-yyyy"
+                                            customInput={<Input readOnly />}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Emergency */}
                         <div className="grid sm:grid-cols-2 gap-4">
@@ -495,7 +606,7 @@ export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
 
             {guests.map((g, i) => {
                 return !isEditing && (
-                    <div className="rounded-xl bg-muted/30 p-5 space-y-4" key={i}>
+                    <div className="rounded-[3px] bg-muted/30 p-5 space-y-4" key={i}>
                         {/* Name */}
                         <div className="flex justify-between items-start">
                             <div>
@@ -562,6 +673,19 @@ export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
                                 </div>
                             </div>
                         )}
+
+                        {g.nationality?.toLowerCase() === "foreigner" && (
+                            <div className="border-t pt-3">
+                                <p className="text-sm font-medium mb-2">Visa Details</p>
+
+                                <div className="grid sm:grid-cols-3 gap-4">
+                                    <InfoRow label="Visa Number" value={g.visa_number} />
+                                    <InfoRow label="Issue Date" value={formatReadableDate(g.visa_issue_date)} />
+                                    <InfoRow label="Expiry Date" value={formatReadableDate(g.visa_expiry_date)} />
+                                </div>
+                            </div>
+                        )}
+
                     </div>
                 )
             }
@@ -575,15 +699,35 @@ export default function GuestsEmbedded({ bookingId, guestCount }: Props) {
 
             {/* ID Preview */}
             <Dialog open={!!previewId} onOpenChange={() => setPreviewId(null)}>
-                <DialogContent>
+                <DialogContent className="max-w-lg [&>button.absolute]:hidden">
                     <DialogHeader>
-                        <DialogTitle>ID Proof</DialogTitle>
+                        <DialogTitle className="flex items-center justify-between">
+                            <span>ID Proof</span>
+
+                            {previewId && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => downloadImage(previewId)}
+                                >
+                                    Download
+                                </Button>
+                            )}
+                        </DialogTitle>
                     </DialogHeader>
+
                     {previewId && (
-                        <img src={previewId} className="rounded-lg" />
+                        <div className="flex justify-center">
+                            <img
+                                src={previewId}
+                                className="rounded-lg max-h-[70vh] object-contain"
+                                alt="ID Proof"
+                            />
+                        </div>
                     )}
                 </DialogContent>
             </Dialog>
+
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
                 <DialogContent>
                     <DialogHeader>

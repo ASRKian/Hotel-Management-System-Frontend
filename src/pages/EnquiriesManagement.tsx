@@ -175,14 +175,14 @@ export default function EnquiriesManagement() {
                             <div className="w-full sm:w-64 space-y-1">
                                 <Label className="text-xs">Property</Label>
                                 <select
-                                    className="w-full h-10 rounded-xl border border-border bg-background px-3 text-sm"
+                                    className="w-full h-10 rounded-[3px] border border-border bg-background px-3 text-sm"
                                     value={selectedPropertyId ?? ""}
                                     onChange={(e) =>
                                         setSelectedPropertyId(Number(e.target.value) || null)
                                     }
                                     disabled={!(isSuperAdmin || isOwner)}
                                 >
-                                    <option value="">All properties</option>
+                                    {/* <option value="" disabled>properties</option> */}
                                     {!myPropertiesLoading &&
                                         myProperties?.properties?.map((property) => (
                                             <option key={property.id} value={property.id}>
@@ -192,6 +192,16 @@ export default function EnquiriesManagement() {
                                 </select>
                             </div>
                         )}
+
+                        <Button
+                            variant="hero"
+                            onClick={() => {
+                                navigate("/create-enquiry")
+                            }}
+                        >
+                            New Enquiry
+                        </Button>
+
                     </div>
 
 
@@ -200,7 +210,7 @@ export default function EnquiriesManagement() {
                         {!enquiryLoading && enquiries && enquiries?.data.map((e) => (
                             <div
                                 key={e.id}
-                                className="rounded-xl border bg-card p-4 flex justify-between items-start"
+                                className="rounded-[3px] border bg-card p-4 flex justify-between items-start"
                             >
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
@@ -306,7 +316,7 @@ export default function EnquiriesManagement() {
                         <div className="space-y-2">
                             <Label>Status</Label>
                             <select
-                                className="w-full h-10 rounded-xl border px-3 text-sm"
+                                className="w-full h-10 rounded-[3px] border px-3 text-sm"
                                 value={status}
                                 onChange={(e) =>
                                     setStatus(e.target.value as EnquiryStatus)
@@ -314,8 +324,8 @@ export default function EnquiriesManagement() {
                             >
                                 <option value="open">Open</option>
                                 <option value="follow_up">Follow Up</option>
-                                <option value="reserved">Reserved</option>
-                                <option value="booked">Booked</option>
+                                {/* <option value="reserved">Reserved</option> */}
+                                {/* <option value="booked">Booked</option> */}
                                 <option value="closed">Closed</option>
                                 <option value="cancelled">Cancelled</option>
                             </select>
@@ -335,7 +345,7 @@ export default function EnquiriesManagement() {
                         <div className="space-y-2">
                             <Label>Comment</Label>
                             <textarea
-                                className="w-full min-h-[80px] rounded-xl border px-3 py-2 text-sm"
+                                className="w-full min-h-[80px] rounded-[3px] border px-3 py-2 text-sm"
                                 value={comment}
                                 onChange={(e) => setComment(e.target.value)}
                             />

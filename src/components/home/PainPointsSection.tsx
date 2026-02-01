@@ -40,7 +40,7 @@ const PainPointsSection = () => {
           {painPoints.map((point, index) => (
             <div
               key={index}
-              className="bg-card p-6 rounded-xl border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+              className="bg-card p-6 rounded-[3px] border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
             >
               <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
                 <point.icon className="h-6 w-6 text-primary" />
